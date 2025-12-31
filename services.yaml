@@ -6,7 +6,7 @@ add:
       name: User ID
       description: The user ID to add the favorite for.
       required: true
-      example: "d7ae8fe13f584ba08bf0c41f0bdbe576"
+      example: "user1"
       selector:
         text:
     entity_id:
@@ -38,7 +38,7 @@ remove:
       name: User ID
       description: The user ID to remove the favorite for.
       required: true
-      example: "d7ae8fe13f584ba08bf0c41f0bdbe576"
+      example: "user1"
       selector:
         text:
     entity_id:
@@ -56,7 +56,7 @@ toggle:
       name: User ID
       description: The user ID to toggle the favorite for.
       required: true
-      example: "d7ae8fe13f584ba08bf0c41f0bdbe576"
+      example: "user1"
       selector:
         text:
     entity_id:
@@ -74,14 +74,14 @@ reorder:
       name: User ID
       description: The user ID to reorder favorites for.
       required: true
-      example: "d7ae8fe13f584ba08bf0c41f0bdbe576"
+      example: "user1"
       selector:
         text:
     entity_ids:
       name: Entity IDs
       description: List of entity IDs in desired order.
       required: true
-      example: '["light.living_room", "switch.kitchen", "climate.thermostat"]'
+      example: '["light.entity", "switch.entity", "climate.thermostat"]'
       selector:
         object:
 
@@ -93,6 +93,6 @@ clear:
       name: User ID
       description: The user ID to clear favorites for.
       required: true
-      example: "d7ae8fe13f584ba08bf0c41f0bdbe576"
+      example: "user1"
       selector:
         text:
