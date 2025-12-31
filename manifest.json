@@ -1,0 +1,12 @@
+{
+  "domain": "favorites",
+  "name": "Favorites",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/hamdi30986-ctrl/hafavorites",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/hamdi30986-ctrl/hafavorites/issues",
+  "requirements": [],
+  "version": "2.0.0"
+}

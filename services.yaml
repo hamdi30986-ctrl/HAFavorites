@@ -1,0 +1,98 @@
+add:
+  name: Add to Favorites
+  description: Add an entity to your favorites list.
+  fields:
+    user_id:
+      name: User ID
+      description: The user ID to add the favorite for.
+      required: true
+      example: "d7ae8fe13f584ba08bf0c41f0bdbe576"
+      selector:
+        text:
+    entity_id:
+      name: Entity
+      description: The entity to add to favorites.
+      required: true
+      selector:
+        entity:
+    custom_name:
+      name: Custom Name
+      description: Optional custom display name for this favorite.
+      required: false
+      example: "Living Room Light"
+      selector:
+        text:
+    custom_icon:
+      name: Custom Icon
+      description: Optional custom icon (mdi format).
+      required: false
+      example: "mdi:lightbulb"
+      selector:
+        icon:
+
+remove:
+  name: Remove from Favorites
+  description: Remove an entity from your favorites list.
+  fields:
+    user_id:
+      name: User ID
+      description: The user ID to remove the favorite for.
+      required: true
+      example: "d7ae8fe13f584ba08bf0c41f0bdbe576"
+      selector:
+        text:
+    entity_id:
+      name: Entity
+      description: The entity to remove from favorites.
+      required: true
+      selector:
+        entity:
+
+toggle:
+  name: Toggle Favorite
+  description: Toggle an entity's favorite status (add if not favorite, remove if favorite).
+  fields:
+    user_id:
+      name: User ID
+      description: The user ID to toggle the favorite for.
+      required: true
+      example: "d7ae8fe13f584ba08bf0c41f0bdbe576"
+      selector:
+        text:
+    entity_id:
+      name: Entity
+      description: The entity to toggle.
+      required: true
+      selector:
+        entity:
+
+reorder:
+  name: Reorder Favorites
+  description: Set the order of favorites.
+  fields:
+    user_id:
+      name: User ID
+      description: The user ID to reorder favorites for.
+      required: true
+      example: "d7ae8fe13f584ba08bf0c41f0bdbe576"
+      selector:
+        text:
+    entity_ids:
+      name: Entity IDs
+      description: List of entity IDs in desired order.
+      required: true
+      example: '["light.living_room", "switch.kitchen", "climate.thermostat"]'
+      selector:
+        object:
+
+clear:
+  name: Clear All Favorites
+  description: Remove all entities from favorites for a user.
+  fields:
+    user_id:
+      name: User ID
+      description: The user ID to clear favorites for.
+      required: true
+      example: "d7ae8fe13f584ba08bf0c41f0bdbe576"
+      selector:
+        text:

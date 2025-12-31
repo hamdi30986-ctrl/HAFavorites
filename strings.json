@@ -1,0 +1,89 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Favorites",
+        "description": "This will enable the Favorites integration, allowing you to mark entities as favorites and display them in a dedicated view."
+      }
+    },
+    "abort": {
+      "already_configured": "Favorites is already configured."
+    }
+  },
+  "services": {
+    "add": {
+      "name": "Add to Favorites",
+      "description": "Add an entity to your favorites list.",
+      "fields": {
+        "user_id": {
+          "name": "User ID",
+          "description": "The user ID to add the favorite for."
+        },
+        "entity_id": {
+          "name": "Entity",
+          "description": "The entity to add to favorites."
+        },
+        "custom_name": {
+          "name": "Custom Name",
+          "description": "Optional custom display name."
+        },
+        "custom_icon": {
+          "name": "Custom Icon",
+          "description": "Optional custom icon."
+        }
+      }
+    },
+    "remove": {
+      "name": "Remove from Favorites",
+      "description": "Remove an entity from your favorites list.",
+      "fields": {
+        "user_id": {
+          "name": "User ID",
+          "description": "The user ID to remove the favorite for."
+        },
+        "entity_id": {
+          "name": "Entity",
+          "description": "The entity to remove from favorites."
+        }
+      }
+    },
+    "toggle": {
+      "name": "Toggle Favorite",
+      "description": "Toggle an entity's favorite status.",
+      "fields": {
+        "user_id": {
+          "name": "User ID",
+          "description": "The user ID to toggle the favorite for."
+        },
+        "entity_id": {
+          "name": "Entity",
+          "description": "The entity to toggle."
+        }
+      }
+    },
+    "reorder": {
+      "name": "Reorder Favorites",
+      "description": "Set the order of favorites.",
+      "fields": {
+        "user_id": {
+          "name": "User ID",
+          "description": "The user ID to reorder favorites for."
+        },
+        "entity_ids": {
+          "name": "Entity IDs",
+          "description": "List of entity IDs in desired order."
+        }
+      }
+    },
+    "clear": {
+      "name": "Clear All Favorites",
+      "description": "Remove all entities from favorites for a user.",
+      "fields": {
+        "user_id": {
+          "name": "User ID",
+          "description": "The user ID to clear favorites for."
+        }
+      }
+    }
+  }
+}
