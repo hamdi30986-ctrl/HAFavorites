@@ -1,7 +1,7 @@
 """Constants for the Favorites integration."""
 
 DOMAIN = "favorites"
-STORAGE_VERSION = 1  # Keep at 1, migration handled internally
+STORAGE_VERSION = 1
 STORAGE_KEY = DOMAIN
 
 # Services
