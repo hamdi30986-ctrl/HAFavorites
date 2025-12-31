@@ -4,12 +4,16 @@ This custom component adds a **favorites system** to Home Assistant dashboards.
 
 It allows users to mark any existing card as a favorite using a star button, then automatically collect those favorites into a dedicated **Favorites Grid** card.
 
+<img width="515" height="268" alt="fav-reddit3" src="https://github.com/user-attachments/assets/1fa46d5d-1d0f-49cf-8fb8-a50eeee7f726" />
+<img width="499" height="202" alt="fav-reddit2" src="https://github.com/user-attachments/assets/84e2e64e-95f1-4e02-8f57-6565d4ecf509" />
+
 The favorites grid can live in the same view, a different view, or an entirely different dashboard.
 
 The goal is simple:  
 quick access to important entities without duplicating cards manually.
 
----
+<img width="491" height="389" alt="fav-reddit1" src="https://github.com/user-attachments/assets/71471709-e678-4338-a3e6-72e6ab361509" />
+
 
 ## How It Works
 
