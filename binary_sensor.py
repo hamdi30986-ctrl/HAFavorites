@@ -18,13 +18,11 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Favorites binary sensor from a config entry."""
     store: FavoritesStore = hass.data[DOMAIN]["store"]
     async_add_entities([FavoritesActiveSensor(store)], True)
 
 
 class FavoritesActiveSensor(BinarySensorEntity):
-    """Binary sensor that indicates if any favorites exist (across all users)."""
 
     _attr_has_entity_name = True
     _attr_name = "Has Favorites"
@@ -37,17 +35,14 @@ class FavoritesActiveSensor(BinarySensorEntity):
         self._update_state()
 
     def _update_state(self) -> None:
-        """Update the is_on state based on all users."""
         total = sum(len(items) for items in self._store.users.values())
         self._attr_is_on = total > 0
 
     async def async_added_to_hass(self) -> None:
-        """Run when entity about to be added to hass."""
         await super().async_added_to_hass()
 
         @callback
         def async_favorites_changed(event) -> None:
-            """Handle favorites changed event."""
             self._update_state()
             self.async_write_ha_state()
 
@@ -58,5 +53,4 @@ class FavoritesActiveSensor(BinarySensorEntity):
         )
 
     async def async_update(self) -> None:
-        """Update the sensor."""
         self._update_state()
