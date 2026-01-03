@@ -1,8 +1,8 @@
 /**
  * Favorites Grid Card for Home Assistant
- * v2.8.0 - Removed X button, fixed fan mode button position (top-right)
+ * v2.9.0 - Long press to rename (2s hold), removed X button, fan mode button
  * 
- * Features: user_id filtering, light/climate/cover styling, fan mode dropdown
+ * Features: user_id filtering, light/climate/cover styling, fan mode dropdown, rename popup
  */
 class FavoritesGridCard extends HTMLElement {
   constructor() {
@@ -18,7 +18,15 @@ class FavoritesGridCard extends HTMLElement {
     this._openDropdownId = null;
     this._openFanDropdownId = null;
     this._draggedItem = null;
-    this._userId = null;  // ADDED: store user_id
+    this._userId = null;
+    
+    // Long-press rename properties
+    this._longPressTimer = null;
+    this._longPressGlowTimer = null;
+    this._longPressStartPos = null;
+    this._longPressEntity = null;
+    this._isLongPressing = false;
+    this._renameEntityId = null;
   }
 
   // ============================================
@@ -1147,6 +1155,134 @@ class FavoritesGridCard extends HTMLElement {
         .climate-item.is-on .climate-temp { color: white; }
         .climate-controls.disabled .climate-temp { color: rgba(255,255,255,0.35); }
         
+        /* ========== LONG PRESS RENAME ========== */
+        .item.long-press-glow {
+          animation: longPressGlow 0.5s ease-in-out infinite;
+        }
+        
+        @keyframes longPressGlow {
+          0%, 100% { 
+            box-shadow: 0 0 0 2px rgba(0, 200, 180, 0.3), 0 0 20px rgba(0, 200, 180, 0.2);
+          }
+          50% { 
+            box-shadow: 0 0 0 4px rgba(0, 200, 180, 0.5), 0 0 30px rgba(0, 200, 180, 0.4);
+          }
+        }
+        
+        /* Rename Popup Overlay */
+        .rename-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.7);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 10000;
+          opacity: 0;
+          visibility: hidden;
+          transition: opacity 0.2s, visibility 0.2s;
+          backdrop-filter: blur(4px);
+        }
+        .rename-overlay.show {
+          opacity: 1;
+          visibility: visible;
+        }
+        
+        .rename-popup {
+          background: rgba(30, 30, 35, 0.98);
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          border-radius: 20px;
+          padding: 20px;
+          width: 280px;
+          max-width: 90vw;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+          transform: scale(0.9);
+          transition: transform 0.2s;
+        }
+        .rename-overlay.show .rename-popup {
+          transform: scale(1);
+        }
+        
+        .rename-title {
+          font-size: 14px;
+          font-weight: 600;
+          color: rgba(255, 255, 255, 0.9);
+          margin-bottom: 16px;
+          text-align: center;
+        }
+        
+        .rename-input {
+          width: 100%;
+          padding: 12px 14px;
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          border-radius: 12px;
+          background: rgba(255, 255, 255, 0.08);
+          color: white;
+          font-size: 15px;
+          outline: none;
+          transition: border-color 0.2s, box-shadow 0.2s;
+          box-sizing: border-box;
+        }
+        .rename-input:focus {
+          border-color: rgba(0, 200, 180, 0.5);
+          box-shadow: 0 0 0 3px rgba(0, 200, 180, 0.15);
+        }
+        .rename-input::placeholder {
+          color: rgba(255, 255, 255, 0.35);
+        }
+        
+        .rename-buttons {
+          display: flex;
+          gap: 10px;
+          margin-top: 16px;
+        }
+        
+        .rename-btn {
+          flex: 1;
+          padding: 11px 16px;
+          border: none;
+          border-radius: 10px;
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        
+        .rename-btn.cancel {
+          background: rgba(255, 255, 255, 0.1);
+          color: rgba(255, 255, 255, 0.8);
+        }
+        .rename-btn.cancel:hover {
+          background: rgba(255, 255, 255, 0.15);
+        }
+        
+        .rename-btn.save {
+          background: linear-gradient(135deg, #00897b, #00acc1);
+          color: white;
+        }
+        .rename-btn.save:hover {
+          transform: scale(1.02);
+          box-shadow: 0 4px 15px rgba(0, 200, 180, 0.3);
+        }
+        
+        .rename-btn.reset {
+          background: rgba(244, 67, 54, 0.2);
+          color: rgba(244, 67, 54, 0.9);
+          font-size: 12px;
+          padding: 8px 12px;
+        }
+        .rename-btn.reset:hover {
+          background: rgba(244, 67, 54, 0.3);
+        }
+        
+        .rename-reset-row {
+          margin-top: 12px;
+          text-align: center;
+        }
+        
         /* ========== EMPTY STATE ========== */
         .empty { text-align: center; padding: 32px 16px; }
         .empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.3; }
@@ -1171,6 +1307,21 @@ class FavoritesGridCard extends HTMLElement {
             ${this._favorites.map(fav => this._renderItem(fav)).join('')}
           </div>
         `}
+      </div>
+      
+      <!-- Rename Popup -->
+      <div class="rename-overlay">
+        <div class="rename-popup">
+          <div class="rename-title">Rename</div>
+          <input type="text" class="rename-input" placeholder="Enter custom name...">
+          <div class="rename-buttons">
+            <button class="rename-btn cancel">Cancel</button>
+            <button class="rename-btn save">Save</button>
+          </div>
+          <div class="rename-reset-row">
+            <button class="rename-btn reset">Reset to Default</button>
+          </div>
+        </div>
       </div>
     `;
     
@@ -1436,6 +1587,223 @@ class FavoritesGridCard extends HTMLElement {
         el.addEventListener('drop', (e) => this._handleDrop(e, el.dataset.entity));
       });
     }
+    
+    // Long press to rename (for all items)
+    this.shadowRoot.querySelectorAll('.item').forEach(el => {
+      el.addEventListener('pointerdown', (e) => this._handlePointerDown(e, el));
+      el.addEventListener('pointermove', (e) => this._handlePointerMove(e));
+      el.addEventListener('pointerup', (e) => this._handlePointerUp(e));
+      el.addEventListener('pointercancel', (e) => this._handlePointerUp(e));
+      el.addEventListener('pointerleave', (e) => this._handlePointerUp(e));
+    });
+    
+    // Rename popup buttons
+    const overlay = this.shadowRoot.querySelector('.rename-overlay');
+    if (overlay) {
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) this._hideRenamePopup();
+      });
+    }
+    
+    const cancelBtn = this.shadowRoot.querySelector('.rename-btn.cancel');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => this._hideRenamePopup());
+    }
+    
+    const saveBtn = this.shadowRoot.querySelector('.rename-btn.save');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', () => this._saveRename());
+    }
+    
+    const resetBtn = this.shadowRoot.querySelector('.rename-btn.reset');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => this._resetRename());
+    }
+    
+    const input = this.shadowRoot.querySelector('.rename-input');
+    if (input) {
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') this._saveRename();
+        if (e.key === 'Escape') this._hideRenamePopup();
+      });
+    }
+  }
+
+  // ============================================
+  // LONG PRESS TO RENAME
+  // ============================================
+  _handlePointerDown(e, el) {
+    // Ignore if clicking on buttons/controls
+    if (e.target.closest('button') || e.target.closest('.hvac-dropdown') || e.target.closest('.fan-dropdown')) {
+      return;
+    }
+    
+    const entityId = el.dataset.entity;
+    if (!entityId) return;
+    
+    this._longPressStartPos = { x: e.clientX, y: e.clientY };
+    this._longPressEntity = entityId;
+    this._isLongPressing = false;
+    
+    // Start glow animation at 1.5 seconds
+    this._longPressGlowTimer = setTimeout(() => {
+      el.classList.add('long-press-glow');
+      // Haptic feedback if available
+      if (navigator.vibrate) {
+        navigator.vibrate(30);
+      }
+    }, 1500);
+    
+    // Trigger rename at 2 seconds
+    this._longPressTimer = setTimeout(() => {
+      this._isLongPressing = true;
+      el.classList.remove('long-press-glow');
+      
+      // Stronger haptic feedback
+      if (navigator.vibrate) {
+        navigator.vibrate([50, 30, 50]);
+      }
+      
+      this._showRenamePopup(entityId);
+    }, 2000);
+  }
+  
+  _handlePointerMove(e) {
+    if (!this._longPressStartPos) return;
+    
+    const dx = Math.abs(e.clientX - this._longPressStartPos.x);
+    const dy = Math.abs(e.clientY - this._longPressStartPos.y);
+    
+    // If moved more than 10px, cancel long press (allow drag)
+    if (dx > 10 || dy > 10) {
+      this._cancelLongPress();
+    }
+  }
+  
+  _handlePointerUp(e) {
+    this._cancelLongPress();
+  }
+  
+  _cancelLongPress() {
+    if (this._longPressTimer) {
+      clearTimeout(this._longPressTimer);
+      this._longPressTimer = null;
+    }
+    if (this._longPressGlowTimer) {
+      clearTimeout(this._longPressGlowTimer);
+      this._longPressGlowTimer = null;
+    }
+    
+    // Remove glow from all items
+    this.shadowRoot.querySelectorAll('.item.long-press-glow').forEach(el => {
+      el.classList.remove('long-press-glow');
+    });
+    
+    this._longPressStartPos = null;
+    this._longPressEntity = null;
+  }
+  
+  _showRenamePopup(entityId) {
+    this._renameEntityId = entityId;
+    
+    // Get current name
+    const fav = this._favorites.find(f => f.entity_id === entityId);
+    const entity = this._hass?.states[entityId];
+    const currentName = fav?.custom_name || entity?.attributes?.friendly_name || entityId.split('.')[1].replace(/_/g, ' ');
+    
+    const overlay = this.shadowRoot.querySelector('.rename-overlay');
+    const input = this.shadowRoot.querySelector('.rename-input');
+    
+    if (input) {
+      input.value = currentName;
+      input.placeholder = entity?.attributes?.friendly_name || entityId;
+    }
+    
+    if (overlay) {
+      overlay.classList.add('show');
+      // Focus input after animation
+      setTimeout(() => input?.focus(), 200);
+    }
+  }
+  
+  _hideRenamePopup() {
+    const overlay = this.shadowRoot.querySelector('.rename-overlay');
+    if (overlay) {
+      overlay.classList.remove('show');
+    }
+    this._renameEntityId = null;
+    this._isLongPressing = false;
+  }
+  
+  async _saveRename() {
+    if (!this._renameEntityId || !this._hass || !this._userId) {
+      this._hideRenamePopup();
+      return;
+    }
+    
+    const input = this.shadowRoot.querySelector('.rename-input');
+    const newName = input?.value?.trim();
+    
+    if (!newName) {
+      this._hideRenamePopup();
+      return;
+    }
+    
+    // Update local state immediately for instant feedback
+    const fav = this._favorites.find(f => f.entity_id === this._renameEntityId);
+    if (fav) {
+      fav.custom_name = newName;
+      // Update the name in DOM
+      const item = this.shadowRoot.querySelector(`[data-entity="${this._renameEntityId}"]`);
+      const nameEl = item?.querySelector('.name, .climate-name, .cover-name');
+      if (nameEl) nameEl.textContent = newName;
+    }
+    
+    // Call service
+    try {
+      await this._hass.callService('favorites', 'update', {
+        user_id: this._userId,
+        entity_id: this._renameEntityId,
+        custom_name: newName,
+      });
+    } catch (error) {
+      console.error('[favorites-grid-card] Error renaming:', error);
+    }
+    
+    this._hideRenamePopup();
+  }
+  
+  async _resetRename() {
+    if (!this._renameEntityId || !this._hass || !this._userId) {
+      this._hideRenamePopup();
+      return;
+    }
+    
+    // Update local state - reset to null
+    const fav = this._favorites.find(f => f.entity_id === this._renameEntityId);
+    const entity = this._hass?.states[this._renameEntityId];
+    const defaultName = entity?.attributes?.friendly_name || this._renameEntityId.split('.')[1].replace(/_/g, ' ');
+    
+    if (fav) {
+      fav.custom_name = null;
+      // Update the name in DOM
+      const item = this.shadowRoot.querySelector(`[data-entity="${this._renameEntityId}"]`);
+      const nameEl = item?.querySelector('.name, .climate-name, .cover-name');
+      if (nameEl) nameEl.textContent = defaultName;
+    }
+    
+    // Call service with null to reset
+    try {
+      await this._hass.callService('favorites', 'update', {
+        user_id: this._userId,
+        entity_id: this._renameEntityId,
+        custom_name: null,
+      });
+    } catch (error) {
+      console.error('[favorites-grid-card] Error resetting name:', error);
+    }
+    
+    this._hideRenamePopup();
   }
 
   getCardSize() {
@@ -1450,4 +1818,4 @@ window.customCards = window.customCards || [];
 if (!window.customCards.find(c => c.type === 'favorites-grid-card')) {
   window.customCards.push({ type: 'favorites-grid-card', name: 'Favorites Grid Card', description: 'Displays favorites with climate controls, light styling, and drag-drop reorder' });
 }
-console.info('%c FAVORITES-GRID-CARD %c v2.8.0 ', 'background: #00897b; color: white; font-weight: bold;', 'background: #00acc1; color: white;');
+console.info('%c FAVORITES-GRID-CARD %c v2.9.0 ', 'background: #00897b; color: white; font-weight: bold;', 'background: #00acc1; color: white;');
