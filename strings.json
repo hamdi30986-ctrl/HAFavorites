@@ -84,6 +84,24 @@
           "description": "The user ID to clear favorites for."
         }
       }
+    },
+    "update": {
+      "name": "Update Favorite",
+      "description": "Update a favorite's custom name.",
+      "fields": {
+        "user_id": {
+          "name": "User ID",
+          "description": "The user ID of the favorite to update."
+        },
+        "entity_id": {
+          "name": "Entity",
+          "description": "The entity to update."
+        },
+        "custom_name": {
+          "name": "Custom Name",
+          "description": "New custom name (leave empty to reset to default)."
+        }
+      }
     }
   }
 }
