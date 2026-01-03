@@ -1,3 +1,8 @@
+V1.1:
+- Added Rename function to the entities inside the gird.
+  * Click/Press & hold for 1.5sec to re-order entities.
+  * Click/Press & Hold for 2sec, a rename popup appears to rename entities.
+
 # Favorites – Home Assistant Custom Component
 
 This custom component adds a **favorites system** to Home Assistant dashboards.
