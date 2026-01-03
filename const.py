@@ -1,7 +1,7 @@
 """Constants for the Favorites integration."""
 
 DOMAIN = "favorites"
-STORAGE_VERSION = 1
+STORAGE_VERSION = 1  # Keep at 1, migration handled internally
 STORAGE_KEY = DOMAIN
 
 # Services
@@ -10,6 +10,7 @@ SERVICE_REMOVE = "remove"
 SERVICE_TOGGLE = "toggle"
 SERVICE_REORDER = "reorder"
 SERVICE_CLEAR = "clear"
+SERVICE_UPDATE = "update"
 
 # Attributes
 ATTR_ENTITY_ID = "entity_id"
