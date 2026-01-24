@@ -1,9 +1,334 @@
 /**
  * Favorites Grid Card for Home Assistant
- * v2.9.0 - Long press to rename (2s hold), removed X button, fan mode button
+ * v3.0.0 - Theme Support & Visual Configuration Editor
  * 
- * Features: user_id filtering, light/climate/cover styling, fan mode dropdown, rename popup
+ * Features:
+ * - 4 Theme options: Dark (frosted glass), Light (frosted glass), Liquid Glass, Native
+ * - Visual configuration editor
+ * - card-mod compatibility
+ * - user_id filtering
+ * - light/climate/cover styling
+ * - fan mode dropdown
+ * - rename popup (long-press)
+ * - drag-drop reorder
  */
+
+// ============================================
+// CONFIGURATION EDITOR
+// ============================================
+class FavoritesGridCardEditor extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+    this._config = {};
+  }
+
+  setConfig(config) {
+    this._config = { ...config };
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+  }
+
+  _render() {
+    this.shadowRoot.innerHTML = `
+      <style>
+        :host {
+          display: block;
+          padding: 16px;
+        }
+        
+        .editor-row {
+          display: flex;
+          flex-direction: column;
+          margin-bottom: 16px;
+        }
+        
+        .editor-row label {
+          font-size: 12px;
+          font-weight: 500;
+          color: var(--primary-text-color);
+          margin-bottom: 6px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          opacity: 0.8;
+        }
+        
+        .editor-row input,
+        .editor-row select {
+          padding: 10px 12px;
+          border: 1px solid var(--divider-color, rgba(255,255,255,0.12));
+          border-radius: 8px;
+          background: var(--card-background-color, rgba(255,255,255,0.05));
+          color: var(--primary-text-color);
+          font-size: 14px;
+          outline: none;
+          transition: border-color 0.2s;
+        }
+        
+        .editor-row input:focus,
+        .editor-row select:focus {
+          border-color: var(--primary-color, #03a9f4);
+        }
+        
+        .editor-row input[type="number"] {
+          width: 80px;
+        }
+        
+        .editor-row input[type="checkbox"] {
+          width: 18px;
+          height: 18px;
+          margin-right: 8px;
+        }
+        
+        .checkbox-row {
+          flex-direction: row;
+          align-items: center;
+        }
+        
+        .checkbox-row label {
+          margin-bottom: 0;
+          text-transform: none;
+          font-size: 14px;
+        }
+        
+        .theme-selector {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 10px;
+        }
+        
+        .theme-option {
+          position: relative;
+          padding: 14px 12px;
+          border: 2px solid var(--divider-color, rgba(255,255,255,0.12));
+          border-radius: 12px;
+          cursor: pointer;
+          transition: all 0.2s;
+          text-align: center;
+        }
+        
+        .theme-option:hover {
+          border-color: var(--primary-color, #03a9f4);
+          background: rgba(3, 169, 244, 0.05);
+        }
+        
+        .theme-option.selected {
+          border-color: var(--primary-color, #03a9f4);
+          background: rgba(3, 169, 244, 0.1);
+        }
+        
+        .theme-option.selected::after {
+          content: '✓';
+          position: absolute;
+          top: 6px;
+          right: 8px;
+          font-size: 12px;
+          color: var(--primary-color, #03a9f4);
+        }
+        
+        .theme-preview {
+          width: 100%;
+          height: 40px;
+          border-radius: 8px;
+          margin-bottom: 8px;
+        }
+        
+        .theme-preview.dark {
+          background: linear-gradient(135deg, rgba(25, 25, 28, 0.9), rgba(40, 40, 45, 0.8));
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          backdrop-filter: blur(10px);
+        }
+        
+        .theme-preview.light {
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.85), rgba(240, 240, 245, 0.9));
+          border: 1px solid rgba(0, 0, 0, 0.08);
+        }
+        
+        .theme-preview.liquid {
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.05));
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          backdrop-filter: blur(20px);
+        }
+        
+        .theme-preview.native {
+          background: var(--ha-card-background, var(--card-background-color, #fff));
+          border: 1px solid var(--divider-color, rgba(0,0,0,0.12));
+        }
+        
+        .theme-name {
+          font-size: 12px;
+          font-weight: 500;
+          color: var(--primary-text-color);
+        }
+        
+        .section-title {
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--primary-text-color);
+          margin: 20px 0 12px 0;
+          padding-bottom: 8px;
+          border-bottom: 1px solid var(--divider-color, rgba(255,255,255,0.1));
+        }
+        
+        .section-title:first-child {
+          margin-top: 0;
+        }
+      </style>
+      
+      <div class="section-title">Theme</div>
+      <div class="theme-selector">
+        <div class="theme-option ${this._config.theme === 'dark' || !this._config.theme ? 'selected' : ''}" data-theme="dark">
+          <div class="theme-preview dark"></div>
+          <div class="theme-name">Dark Glass</div>
+        </div>
+        <div class="theme-option ${this._config.theme === 'light' ? 'selected' : ''}" data-theme="light">
+          <div class="theme-preview light"></div>
+          <div class="theme-name">Light Glass</div>
+        </div>
+        <div class="theme-option ${this._config.theme === 'liquid' ? 'selected' : ''}" data-theme="liquid">
+          <div class="theme-preview liquid"></div>
+          <div class="theme-name">Liquid Glass</div>
+        </div>
+        <div class="theme-option ${this._config.theme === 'native' ? 'selected' : ''}" data-theme="native">
+          <div class="theme-preview native"></div>
+          <div class="theme-name">Native HA</div>
+        </div>
+      </div>
+      
+      <div class="section-title">General</div>
+      
+      <div class="editor-row">
+        <label>Title</label>
+        <input type="text" id="title" value="${this._config.title || 'Favorites'}" placeholder="Card title">
+      </div>
+      
+      <div class="editor-row">
+        <label>Columns</label>
+        <input type="number" id="columns" value="${this._config.columns || 2}" min="1" max="6">
+      </div>
+      
+      <div class="editor-row">
+        <label>Empty Message</label>
+        <input type="text" id="empty_message" value="${this._config.empty_message || 'No favorites yet!'}" placeholder="Message when empty">
+      </div>
+      
+      <div class="section-title">Features</div>
+      
+      <div class="editor-row checkbox-row">
+        <input type="checkbox" id="show_empty_message" ${this._config.show_empty_message !== false ? 'checked' : ''}>
+        <label for="show_empty_message">Show empty message</label>
+      </div>
+      
+      <div class="editor-row checkbox-row">
+        <input type="checkbox" id="show_climate_controls" ${this._config.show_climate_controls !== false ? 'checked' : ''}>
+        <label for="show_climate_controls">Show climate controls</label>
+      </div>
+      
+      <div class="editor-row checkbox-row">
+        <input type="checkbox" id="show_cover_controls" ${this._config.show_cover_controls !== false ? 'checked' : ''}>
+        <label for="show_cover_controls">Show cover controls</label>
+      </div>
+      
+      <div class="editor-row checkbox-row">
+        <input type="checkbox" id="light_compact" ${this._config.light_compact !== false ? 'checked' : ''}>
+        <label for="light_compact">Compact light cards</label>
+      </div>
+      
+      <div class="editor-row checkbox-row">
+        <input type="checkbox" id="allow_reorder" ${this._config.allow_reorder !== false ? 'checked' : ''}>
+        <label for="allow_reorder">Allow drag-drop reorder</label>
+      </div>
+      
+      <div class="section-title">Advanced</div>
+      
+      <div class="editor-row">
+        <label>Custom CSS (card-mod style)</label>
+        <textarea id="card_mod_style" rows="4" style="width: 100%; padding: 10px 12px; border: 1px solid var(--divider-color, rgba(255,255,255,0.12)); border-radius: 8px; background: var(--card-background-color, rgba(255,255,255,0.05)); color: var(--primary-text-color); font-family: monospace; font-size: 12px; resize: vertical;">${this._config.card_mod?.style || ''}</textarea>
+      </div>
+    `;
+    
+    this._attachListeners();
+  }
+
+  _attachListeners() {
+    // Theme selector
+    this.shadowRoot.querySelectorAll('.theme-option').forEach(el => {
+      el.addEventListener('click', () => {
+        this._updateConfig('theme', el.dataset.theme);
+        this._render();
+      });
+    });
+    
+    // Text inputs
+    ['title', 'empty_message'].forEach(id => {
+      const input = this.shadowRoot.getElementById(id);
+      if (input) {
+        input.addEventListener('input', (e) => {
+          this._updateConfig(id, e.target.value);
+        });
+      }
+    });
+    
+    // Number inputs
+    ['columns'].forEach(id => {
+      const input = this.shadowRoot.getElementById(id);
+      if (input) {
+        input.addEventListener('change', (e) => {
+          this._updateConfig(id, parseInt(e.target.value) || 2);
+        });
+      }
+    });
+    
+    // Checkboxes
+    ['show_empty_message', 'show_climate_controls', 'show_cover_controls', 'light_compact', 'allow_reorder'].forEach(id => {
+      const input = this.shadowRoot.getElementById(id);
+      if (input) {
+        input.addEventListener('change', (e) => {
+          this._updateConfig(id, e.target.checked);
+        });
+      }
+    });
+    
+    // Custom CSS
+    const cssInput = this.shadowRoot.getElementById('card_mod_style');
+    if (cssInput) {
+      cssInput.addEventListener('input', (e) => {
+        const style = e.target.value.trim();
+        if (style) {
+          this._config.card_mod = { style };
+        } else {
+          delete this._config.card_mod;
+        }
+        this._dispatchChange();
+      });
+    }
+  }
+
+  _updateConfig(key, value) {
+    this._config = { ...this._config, [key]: value };
+    this._dispatchChange();
+  }
+
+  _dispatchChange() {
+    this.dispatchEvent(new CustomEvent('config-changed', {
+      detail: { config: this._config },
+      bubbles: true,
+      composed: true,
+    }));
+  }
+}
+
+if (!customElements.get('favorites-grid-card-editor')) {
+  customElements.define('favorites-grid-card-editor', FavoritesGridCardEditor);
+}
+
+
+// ============================================
+// MAIN CARD
+// ============================================
 class FavoritesGridCard extends HTMLElement {
   constructor() {
     super();
@@ -29,8 +354,222 @@ class FavoritesGridCard extends HTMLElement {
     this._renameEntityId = null;
   }
 
+  // Static method for visual editor
+  static getConfigElement() {
+    return document.createElement('favorites-grid-card-editor');
+  }
+
+  static getStubConfig() {
+    return {
+      title: 'Favorites',
+      theme: 'dark',
+      columns: 2,
+      show_empty_message: true,
+      empty_message: 'No favorites yet!',
+      show_climate_controls: true,
+      show_cover_controls: true,
+      light_compact: true,
+      allow_reorder: true,
+    };
+  }
+
   // ============================================
-  // SYNC LOGIC - UNCHANGED (except user_id filter)
+  // THEME STYLES
+  // ============================================
+  _getThemeStyles() {
+    const theme = this._config.theme || 'dark';
+    
+    const themes = {
+      dark: `
+        /* Dark Frosted Glass Theme */
+        --fgc-card-bg: rgba(25, 25, 28, 0.55);
+        --fgc-card-border: rgba(255, 255, 255, 0.06);
+        --fgc-card-shadow: 0 8px 32px rgba(0,0,0,0.3), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.05);
+        --fgc-card-blur: blur(10px);
+        --fgc-card-radius: 24px;
+        
+        --fgc-item-bg: rgba(40, 40, 45, 0.6);
+        --fgc-item-border: rgba(255, 255, 255, 0.08);
+        --fgc-item-hover-bg: rgba(50, 50, 55, 0.7);
+        --fgc-item-hover-border: rgba(255, 255, 255, 0.12);
+        
+        --fgc-text-primary: rgba(255, 255, 255, 0.92);
+        --fgc-text-secondary: rgba(255, 255, 255, 0.5);
+        --fgc-text-tertiary: rgba(255, 255, 255, 0.35);
+        
+        --fgc-icon-bg: rgba(255, 255, 255, 0.1);
+        --fgc-icon-color: rgba(255, 255, 255, 0.8);
+        
+        --fgc-control-bg: rgba(0, 0, 0, 0.3);
+        --fgc-button-bg: rgba(255, 255, 255, 0.1);
+        --fgc-button-hover-bg: rgba(255, 255, 255, 0.2);
+        
+        --fgc-dropdown-bg: rgba(25, 25, 30, 0.98);
+        --fgc-dropdown-border: rgba(255, 255, 255, 0.15);
+        
+        --fgc-accent-primary: #00897b;
+        --fgc-accent-secondary: #00acc1;
+        --fgc-accent-gradient: linear-gradient(135deg, #00897b, #00acc1);
+        
+        --fgc-light-on-bg: linear-gradient(135deg, rgba(255, 180, 80, 0.35), rgba(255, 220, 120, 0.2));
+        --fgc-light-on-border: rgba(255, 190, 90, 0.5);
+        --fgc-light-on-shadow: 0 4px 20px rgba(255, 160, 60, 0.25), inset 0 1px 0 rgba(255,255,255,0.1);
+        --fgc-light-on-icon-bg: linear-gradient(135deg, #ffb347, #ffcc70);
+        --fgc-light-on-icon-shadow: 0 2px 12px rgba(255, 170, 60, 0.6);
+        
+        --fgc-climate-cool-bg: linear-gradient(135deg, rgba(40, 45, 50, 0.7), rgba(0, 180, 220, 0.25));
+        --fgc-climate-cool-border: rgba(0, 200, 240, 0.4);
+        --fgc-climate-heat-bg: linear-gradient(135deg, rgba(45, 40, 35, 0.7), rgba(255, 160, 60, 0.2));
+        --fgc-climate-heat-border: rgba(255, 170, 70, 0.4);
+        
+        --fgc-cover-open-bg: linear-gradient(135deg, rgba(92, 107, 192, 0.25), rgba(121, 134, 203, 0.15));
+        --fgc-cover-open-border: rgba(92, 107, 192, 0.4);
+      `,
+      
+      light: `
+        /* Light Frosted Glass Theme */
+        --fgc-card-bg: rgba(255, 255, 255, 0.75);
+        --fgc-card-border: rgba(0, 0, 0, 0.08);
+        --fgc-card-shadow: 0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.8);
+        --fgc-card-blur: blur(12px);
+        --fgc-card-radius: 24px;
+        
+        --fgc-item-bg: rgba(255, 255, 255, 0.6);
+        --fgc-item-border: rgba(0, 0, 0, 0.06);
+        --fgc-item-hover-bg: rgba(255, 255, 255, 0.8);
+        --fgc-item-hover-border: rgba(0, 0, 0, 0.1);
+        
+        --fgc-text-primary: rgba(0, 0, 0, 0.87);
+        --fgc-text-secondary: rgba(0, 0, 0, 0.54);
+        --fgc-text-tertiary: rgba(0, 0, 0, 0.38);
+        
+        --fgc-icon-bg: rgba(0, 0, 0, 0.06);
+        --fgc-icon-color: rgba(0, 0, 0, 0.6);
+        
+        --fgc-control-bg: rgba(0, 0, 0, 0.04);
+        --fgc-button-bg: rgba(0, 0, 0, 0.06);
+        --fgc-button-hover-bg: rgba(0, 0, 0, 0.1);
+        
+        --fgc-dropdown-bg: rgba(255, 255, 255, 0.98);
+        --fgc-dropdown-border: rgba(0, 0, 0, 0.12);
+        
+        --fgc-accent-primary: #00796b;
+        --fgc-accent-secondary: #0097a7;
+        --fgc-accent-gradient: linear-gradient(135deg, #00796b, #0097a7);
+        
+        --fgc-light-on-bg: linear-gradient(135deg, rgba(255, 193, 7, 0.25), rgba(255, 224, 130, 0.2));
+        --fgc-light-on-border: rgba(255, 160, 0, 0.4);
+        --fgc-light-on-shadow: 0 4px 20px rgba(255, 160, 0, 0.15), inset 0 1px 0 rgba(255,255,255,0.5);
+        --fgc-light-on-icon-bg: linear-gradient(135deg, #ffa726, #ffcc02);
+        --fgc-light-on-icon-shadow: 0 2px 12px rgba(255, 160, 0, 0.4);
+        
+        --fgc-climate-cool-bg: linear-gradient(135deg, rgba(227, 242, 253, 0.9), rgba(179, 229, 252, 0.6));
+        --fgc-climate-cool-border: rgba(3, 169, 244, 0.3);
+        --fgc-climate-heat-bg: linear-gradient(135deg, rgba(255, 243, 224, 0.9), rgba(255, 224, 178, 0.6));
+        --fgc-climate-heat-border: rgba(255, 152, 0, 0.3);
+        
+        --fgc-cover-open-bg: linear-gradient(135deg, rgba(232, 234, 246, 0.9), rgba(197, 202, 233, 0.6));
+        --fgc-cover-open-border: rgba(92, 107, 192, 0.3);
+      `,
+      
+      liquid: `
+        /* Liquid Glass Theme (50% transparency) */
+        --fgc-card-bg: rgba(255, 255, 255, 0.12);
+        --fgc-card-border: rgba(255, 255, 255, 0.25);
+        --fgc-card-shadow: 0 8px 32px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.1) inset;
+        --fgc-card-blur: blur(20px) saturate(180%);
+        --fgc-card-radius: 28px;
+        
+        --fgc-item-bg: rgba(255, 255, 255, 0.08);
+        --fgc-item-border: rgba(255, 255, 255, 0.15);
+        --fgc-item-hover-bg: rgba(255, 255, 255, 0.15);
+        --fgc-item-hover-border: rgba(255, 255, 255, 0.25);
+        
+        --fgc-text-primary: rgba(255, 255, 255, 0.95);
+        --fgc-text-secondary: rgba(255, 255, 255, 0.6);
+        --fgc-text-tertiary: rgba(255, 255, 255, 0.4);
+        
+        --fgc-icon-bg: rgba(255, 255, 255, 0.15);
+        --fgc-icon-color: rgba(255, 255, 255, 0.85);
+        
+        --fgc-control-bg: rgba(0, 0, 0, 0.15);
+        --fgc-button-bg: rgba(255, 255, 255, 0.12);
+        --fgc-button-hover-bg: rgba(255, 255, 255, 0.22);
+        
+        --fgc-dropdown-bg: rgba(30, 30, 35, 0.85);
+        --fgc-dropdown-border: rgba(255, 255, 255, 0.2);
+        
+        --fgc-accent-primary: #26a69a;
+        --fgc-accent-secondary: #4dd0e1;
+        --fgc-accent-gradient: linear-gradient(135deg, #26a69a, #4dd0e1);
+        
+        --fgc-light-on-bg: linear-gradient(135deg, rgba(255, 193, 7, 0.3), rgba(255, 235, 59, 0.15));
+        --fgc-light-on-border: rgba(255, 193, 7, 0.5);
+        --fgc-light-on-shadow: 0 4px 24px rgba(255, 193, 7, 0.3), inset 0 0 0 1px rgba(255,255,255,0.15);
+        --fgc-light-on-icon-bg: linear-gradient(135deg, #ffca28, #ffe082);
+        --fgc-light-on-icon-shadow: 0 2px 16px rgba(255, 193, 7, 0.5);
+        
+        --fgc-climate-cool-bg: linear-gradient(135deg, rgba(0, 188, 212, 0.2), rgba(77, 208, 225, 0.1));
+        --fgc-climate-cool-border: rgba(0, 188, 212, 0.4);
+        --fgc-climate-heat-bg: linear-gradient(135deg, rgba(255, 152, 0, 0.2), rgba(255, 183, 77, 0.1));
+        --fgc-climate-heat-border: rgba(255, 152, 0, 0.4);
+        
+        --fgc-cover-open-bg: linear-gradient(135deg, rgba(92, 107, 192, 0.2), rgba(121, 134, 203, 0.1));
+        --fgc-cover-open-border: rgba(92, 107, 192, 0.4);
+      `,
+      
+      native: `
+        /* Native Home Assistant Theme */
+        --fgc-card-bg: var(--ha-card-background, var(--card-background-color, #fff));
+        --fgc-card-border: var(--ha-card-border-color, var(--divider-color, rgba(0,0,0,0.12)));
+        --fgc-card-shadow: var(--ha-card-box-shadow, 0 2px 2px rgba(0,0,0,0.14));
+        --fgc-card-blur: none;
+        --fgc-card-radius: var(--ha-card-border-radius, 12px);
+        
+        --fgc-item-bg: var(--secondary-background-color, rgba(0,0,0,0.04));
+        --fgc-item-border: var(--divider-color, rgba(0,0,0,0.08));
+        --fgc-item-hover-bg: var(--secondary-background-color, rgba(0,0,0,0.08));
+        --fgc-item-hover-border: var(--divider-color, rgba(0,0,0,0.12));
+        
+        --fgc-text-primary: var(--primary-text-color, rgba(0,0,0,0.87));
+        --fgc-text-secondary: var(--secondary-text-color, rgba(0,0,0,0.54));
+        --fgc-text-tertiary: var(--disabled-text-color, rgba(0,0,0,0.38));
+        
+        --fgc-icon-bg: var(--secondary-background-color, rgba(0,0,0,0.06));
+        --fgc-icon-color: var(--secondary-text-color, rgba(0,0,0,0.6));
+        
+        --fgc-control-bg: var(--secondary-background-color, rgba(0,0,0,0.04));
+        --fgc-button-bg: var(--secondary-background-color, rgba(0,0,0,0.06));
+        --fgc-button-hover-bg: var(--primary-color, #03a9f4);
+        
+        --fgc-dropdown-bg: var(--card-background-color, #fff);
+        --fgc-dropdown-border: var(--divider-color, rgba(0,0,0,0.12));
+        
+        --fgc-accent-primary: var(--primary-color, #03a9f4);
+        --fgc-accent-secondary: var(--accent-color, #ff9800);
+        --fgc-accent-gradient: linear-gradient(135deg, var(--primary-color, #03a9f4), var(--accent-color, #ff9800));
+        
+        --fgc-light-on-bg: var(--state-light-active-color, rgba(255, 214, 0, 0.2));
+        --fgc-light-on-border: var(--state-light-active-color, rgba(255, 214, 0, 0.4));
+        --fgc-light-on-shadow: none;
+        --fgc-light-on-icon-bg: var(--state-light-active-color, #ffd600);
+        --fgc-light-on-icon-shadow: none;
+        
+        --fgc-climate-cool-bg: var(--state-climate-cool-color, rgba(33, 150, 243, 0.1));
+        --fgc-climate-cool-border: var(--state-climate-cool-color, rgba(33, 150, 243, 0.3));
+        --fgc-climate-heat-bg: var(--state-climate-heat-color, rgba(255, 152, 0, 0.1));
+        --fgc-climate-heat-border: var(--state-climate-heat-color, rgba(255, 152, 0, 0.3));
+        
+        --fgc-cover-open-bg: var(--state-cover-open-color, rgba(63, 81, 181, 0.1));
+        --fgc-cover-open-border: var(--state-cover-open-color, rgba(63, 81, 181, 0.3));
+      `,
+    };
+    
+    return themes[theme] || themes.dark;
+  }
+
+  // ============================================
+  // SYNC LOGIC
   // ============================================
   connectedCallback() {
     this._lastSensorIds = '';
@@ -42,7 +581,6 @@ class FavoritesGridCard extends HTMLElement {
     this._handleUpdate = (e) => {
       const { entity_id, isFavorite, user_id } = e.detail;
       
-      // ADDED: Only process if for current user or no user_id (backward compat)
       if (user_id && this._userId && user_id !== this._userId) {
         return;
       }
@@ -92,6 +630,7 @@ class FavoritesGridCard extends HTMLElement {
   setConfig(config) {
     this._config = {
       title: 'Favorites',
+      theme: 'dark',
       columns: 2,
       show_empty_message: true,
       empty_message: 'No favorites yet!',
@@ -107,10 +646,9 @@ class FavoritesGridCard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
-    this._userId = hass.user?.id || null;  // ADDED: store user_id
+    this._userId = hass.user?.id || null;
     
     const sensor = hass.states['sensor.favorites_list'];
-    // CHANGED: read from users[userId] instead of entity_ids
     const users = sensor?.attributes?.users || {};
     const userItems = this._userId ? (users[this._userId] || []) : [];
     const sensorIds = JSON.stringify(userItems.map(item => item.entity_id));
@@ -127,7 +665,6 @@ class FavoritesGridCard extends HTMLElement {
     if (!this._hass) return;
     
     const sensor = this._hass.states['sensor.favorites_list'];
-    // CHANGED: read from users[userId] instead of items/entity_ids
     const users = sensor?.attributes?.users || {};
     const userItems = this._userId ? (users[this._userId] || []) : [];
     this._favorites = userItems;
@@ -136,7 +673,7 @@ class FavoritesGridCard extends HTMLElement {
   }
 
   _smartRender() {
-    const newKey = this._favorites.map(f => f.entity_id).join(',');
+    const newKey = this._favorites.map(f => f.entity_id).join(',') + '_' + (this._config.theme || 'dark');
     
     if (newKey === this._renderedKey && !this._isFirstRender) {
       this._updateStates();
@@ -147,9 +684,6 @@ class FavoritesGridCard extends HTMLElement {
     this._isFirstRender = false;
     this._render();
   }
-  // ============================================
-  // END SYNC LOGIC
-  // ============================================
 
   _updateStates() {
     this._favorites.forEach(fav => {
@@ -191,7 +725,6 @@ class FavoritesGridCard extends HTMLElement {
           controls.classList.toggle('disabled', !isOn);
         }
         
-        // Update fan mode button
         const fanWrap = item.querySelector('.fan-mode-wrap');
         if (fanWrap) {
           fanWrap.classList.toggle('disabled', !isOn);
@@ -305,7 +838,6 @@ class FavoritesGridCard extends HTMLElement {
       dropdown?.classList.remove('show');
       this._openFanDropdownId = null;
     } else {
-      // Close any open dropdowns
       this._closeDropdown();
       this._closeFanDropdown();
       
@@ -340,7 +872,7 @@ class FavoritesGridCard extends HTMLElement {
       this._closeDropdown();
     } else {
       this._closeDropdown();
-      this._closeFanDropdown();  // Also close fan dropdown
+      this._closeFanDropdown();
       this._openDropdownId = entityId;
       
       const item = this.shadowRoot.querySelector(`[data-entity="${entityId}"]`);
@@ -419,6 +951,14 @@ class FavoritesGridCard extends HTMLElement {
     }
   }
 
+  _getCoverIcon(state, position) {
+    if (state === 'opening') return 'mdi:arrow-up-box';
+    if (state === 'closing') return 'mdi:arrow-down-box';
+    if (state === 'closed' || position === 0) return 'mdi:blinds';
+    if (position !== undefined && position < 100) return 'mdi:blinds-open';
+    return 'mdi:blinds-open';
+  }
+
   // ============================================
   // DRAG AND DROP
   // ============================================
@@ -433,7 +973,6 @@ class FavoritesGridCard extends HTMLElement {
     e.target.classList.remove('dragging');
     this._draggedItem = null;
     
-    // Remove all drag-over states
     this.shadowRoot.querySelectorAll('.drag-over').forEach(el => {
       el.classList.remove('drag-over');
     });
@@ -445,7 +984,6 @@ class FavoritesGridCard extends HTMLElement {
     
     const item = this.shadowRoot.querySelector(`[data-entity="${entityId}"]`);
     if (item && !item.classList.contains('dragging')) {
-      // Remove other drag-over states
       this.shadowRoot.querySelectorAll('.drag-over').forEach(el => {
         el.classList.remove('drag-over');
       });
@@ -458,30 +996,26 @@ class FavoritesGridCard extends HTMLElement {
     
     if (!this._draggedItem || this._draggedItem === targetEntityId) return;
     
-    // Reorder favorites
     const draggedIndex = this._favorites.findIndex(f => f.entity_id === this._draggedItem);
     const targetIndex = this._favorites.findIndex(f => f.entity_id === targetEntityId);
     
     if (draggedIndex === -1 || targetIndex === -1) return;
     
-    // Remove dragged item and insert at target position
     const [draggedFav] = this._favorites.splice(draggedIndex, 1);
     this._favorites.splice(targetIndex, 0, draggedFav);
     
-    // Update rendered key and re-render
     this._renderedKey = '';
     this._smartRender();
     
-    // Call reorder service - CHANGED: added user_id
     const newOrder = this._favorites.map(f => f.entity_id);
     this._hass.callService('favorites', 'reorder', { 
       entity_ids: newOrder,
-      user_id: this._userId  // ADDED
+      user_id: this._userId
     });
   }
 
   // ============================================
-  // COMMON METHODS - UNCHANGED
+  // COMMON METHODS
   // ============================================
   async _removeFavorite(entityId, e) {
     e.stopPropagation();
@@ -497,10 +1031,9 @@ class FavoritesGridCard extends HTMLElement {
     this._lastSensorIds = JSON.stringify(Array.from(this._entityIds));
     this._smartRender();
     
-    // CHANGED: added user_id
     await this._hass.callService('favorites', 'remove', { 
       entity_id: entityId,
-      user_id: this._userId  // ADDED
+      user_id: this._userId
     });
   }
 
@@ -543,21 +1076,31 @@ class FavoritesGridCard extends HTMLElement {
   _render() {
     const cols = this._config.columns || 2;
     const allowReorder = this._config.allow_reorder !== false;
+    const customStyle = this._config.card_mod?.style || '';
     
     this.shadowRoot.innerHTML = `
       <style>
-        :host { display: block; }
-        
-        .card {
-          background: rgba(25, 25, 28, 0.55);
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          border-radius: 24px;
-          padding: 16px;
-          backdrop-filter: blur(10px);
-          -webkit-backdrop-filter: blur(10px);
-          box-shadow: 0 8px 32px rgba(0,0,0,0.3), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.05);
+        /* ========== THEME VARIABLES ========== */
+        :host {
+          ${this._getThemeStyles()}
+          display: block;
+          box-sizing: border-box;
         }
         
+        *, *:before, *:after { box-sizing: inherit; }
+        
+        /* ========== CARD CONTAINER ========== */
+        .card {
+          background: var(--fgc-card-bg);
+          border: 1px solid var(--fgc-card-border);
+          border-radius: var(--fgc-card-radius);
+          padding: 16px;
+          backdrop-filter: var(--fgc-card-blur);
+          -webkit-backdrop-filter: var(--fgc-card-blur);
+          box-shadow: var(--fgc-card-shadow);
+        }
+        
+        /* ========== HEADER ========== */
         .header {
           display: flex;
           align-items: center;
@@ -565,13 +1108,23 @@ class FavoritesGridCard extends HTMLElement {
           margin-bottom: 16px;
           padding: 0 4px;
         }
-        .title { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.92); }
-        .count { font-size: 12px; color: rgba(255,255,255,0.5); background: rgba(255,255,255,0.08); padding: 4px 10px; border-radius: 12px; }
+        .title { 
+          font-size: 14px; 
+          font-weight: 600; 
+          color: var(--fgc-text-primary); 
+        }
+        .count { 
+          font-size: 12px; 
+          color: var(--fgc-text-secondary); 
+          background: var(--fgc-icon-bg); 
+          padding: 4px 10px; 
+          border-radius: 12px; 
+        }
         
-        /* Grid with fixed row heights */
+        /* ========== GRID ========== */
         .grid {
           display: grid;
-          grid-template-columns: repeat(${cols}, 1fr);
+          grid-template-columns: repeat(${cols}, minmax(0, 1fr));
           grid-auto-rows: minmax(28px, auto);
           gap: 10px;
           align-items: start;
@@ -583,16 +1136,16 @@ class FavoritesGridCard extends HTMLElement {
         /* ========== BASE ITEM ========== */
         .item {
           position: relative;
-          background: rgba(40, 40, 45, 0.6);
-          border: 1px solid rgba(255,255,255,0.08);
+          background: var(--fgc-item-bg);
+          border: 1px solid var(--fgc-item-border);
           border-radius: 16px;
           transition: transform 0.2s, background 0.2s, border-color 0.2s, box-shadow 0.2s;
           animation: itemAdd 0.3s ease-out;
           ${allowReorder ? 'cursor: grab;' : ''}
         }
         .item:hover { 
-          background: rgba(50,50,55,0.7); 
-          border-color: rgba(255,255,255,0.12); 
+          background: var(--fgc-item-hover-bg); 
+          border-color: var(--fgc-item-hover-border); 
         }
         .item.removing { animation: itemRemove 0.2s ease-out forwards; }
         
@@ -603,8 +1156,8 @@ class FavoritesGridCard extends HTMLElement {
           transform: scale(1.02);
         }
         .item.drag-over {
-          border-color: rgba(0, 200, 180, 0.6);
-          box-shadow: 0 0 0 2px rgba(0, 200, 180, 0.3);
+          border-color: var(--fgc-accent-primary);
+          box-shadow: 0 0 0 2px rgba(0, 137, 123, 0.3);
         }
         
         /* ========== LIGHT ITEM (2 rows) ========== */
@@ -625,42 +1178,42 @@ class FavoritesGridCard extends HTMLElement {
           width: 32px;
           height: 32px;
           border-radius: 50%;
-          background: rgba(255,255,255,0.1);
+          background: var(--fgc-icon-bg);
           display: flex;
           align-items: center;
           justify-content: center;
           flex-shrink: 0;
         }
         .light-item .icon-wrap ha-icon { 
-          color: rgba(255,255,255,0.8); 
+          color: var(--fgc-icon-color); 
           --mdc-icon-size: 18px; 
         }
         
         .light-item.is-on {
-          background: linear-gradient(135deg, rgba(255, 180, 80, 0.35), rgba(255, 220, 120, 0.2));
-          border-color: rgba(255, 190, 90, 0.5);
-          box-shadow: 0 4px 20px rgba(255, 160, 60, 0.25), inset 0 1px 0 rgba(255,255,255,0.1);
+          background: var(--fgc-light-on-bg);
+          border-color: var(--fgc-light-on-border);
+          box-shadow: var(--fgc-light-on-shadow);
         }
         .light-item.is-on .icon-wrap {
-          background: linear-gradient(135deg, #ffb347, #ffcc70);
-          box-shadow: 0 2px 12px rgba(255, 170, 60, 0.6);
+          background: var(--fgc-light-on-icon-bg);
+          box-shadow: var(--fgc-light-on-icon-shadow);
         }
         .light-item.is-on .icon-wrap ha-icon { color: #fff; }
-        .light-item.is-on .state { color: rgba(255, 210, 130, 1); }
+        .light-item.is-on .state { color: var(--fgc-accent-secondary); }
         
         .light-item .item-info { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
-        .light-item .name { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .light-item .state { font-size: 11px; color: rgba(255,255,255,0.5); }
+        .light-item .name { font-size: 13px; font-weight: 500; color: var(--fgc-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .light-item .state { font-size: 11px; color: var(--fgc-text-secondary); }
         
-        /* ========== COVER ITEM (3 rows) ========== */
+        /* ========== COVER ITEM (4 rows) ========== */
         .cover-item {
-          grid-row: span 3;
+          grid-row: span 4;
           padding: 14px;
           display: flex;
           flex-direction: column;
           gap: 10px;
           cursor: ${allowReorder ? 'grab' : 'default'};
-          height: fit-content;
+          height: 100%;
           align-self: start;
         }
         
@@ -674,7 +1227,7 @@ class FavoritesGridCard extends HTMLElement {
           width: 36px;
           height: 36px;
           border-radius: 12px;
-          background: rgba(255,255,255,0.1);
+          background: var(--fgc-icon-bg);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -682,7 +1235,7 @@ class FavoritesGridCard extends HTMLElement {
           transition: all 0.2s;
         }
         .cover-icon-wrap ha-icon {
-          color: rgba(255,255,255,0.7);
+          color: var(--fgc-icon-color);
           --mdc-icon-size: 20px;
         }
         
@@ -705,8 +1258,8 @@ class FavoritesGridCard extends HTMLElement {
         }
         
         .cover-item.is-open {
-          background: linear-gradient(135deg, rgba(92, 107, 192, 0.25), rgba(121, 134, 203, 0.15));
-          border-color: rgba(92, 107, 192, 0.4);
+          background: var(--fgc-cover-open-bg);
+          border-color: var(--fgc-cover-open-border);
           box-shadow: 0 4px 20px rgba(92, 107, 192, 0.15), inset 0 1px 0 rgba(255,255,255,0.08);
         }
         
@@ -725,14 +1278,14 @@ class FavoritesGridCard extends HTMLElement {
         .cover-name {
           font-size: 13px;
           font-weight: 500;
-          color: rgba(255,255,255,0.9);
+          color: var(--fgc-text-primary);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
         }
         .cover-state {
           font-size: 11px;
-          color: rgba(255,255,255,0.5);
+          color: var(--fgc-text-secondary);
           text-transform: capitalize;
         }
         .cover-item.is-open .cover-state { color: rgba(121, 134, 203, 1); }
@@ -742,18 +1295,20 @@ class FavoritesGridCard extends HTMLElement {
         .cover-controls {
           display: flex;
           align-items: center;
-          justify-content: center;
+          justify-content: space-between;
           gap: 8px;
-          padding: 4px 0;
+          padding: 4px 0 0 0;
+          margin-top: auto;
+          width: 100%;
         }
         
         .cover-btn {
-          width: 36px;
-          height: 36px;
+          width: 40px;
+          height: 40px;
           border: none;
-          border-radius: 10px;
-          background: rgba(255,255,255,0.1);
-          color: rgba(255,255,255,0.7);
+          border-radius: 14px;
+          background: var(--fgc-button-bg);
+          color: var(--fgc-icon-color);
           cursor: pointer;
           display: flex;
           align-items: center;
@@ -764,8 +1319,8 @@ class FavoritesGridCard extends HTMLElement {
           --mdc-icon-size: 18px;
         }
         .cover-btn:hover { 
-          background: rgba(255,255,255,0.2); 
-          color: white;
+          background: var(--fgc-button-hover-bg); 
+          color: var(--fgc-text-primary);
           transform: scale(1.08);
         }
         .cover-btn:active { transform: scale(0.95); }
@@ -780,7 +1335,7 @@ class FavoritesGridCard extends HTMLElement {
         }
         .cover-position-track {
           height: 4px;
-          background: rgba(255,255,255,0.12);
+          background: var(--fgc-icon-bg);
           border-radius: 2px;
           overflow: hidden;
         }
@@ -807,8 +1362,8 @@ class FavoritesGridCard extends HTMLElement {
         }
         .standard-item:active { transform: scale(0.98); }
         .standard-item.is-on {
-          background: linear-gradient(135deg, rgba(0,137,123,0.3), rgba(0,172,193,0.3));
-          border-color: rgba(0,172,193,0.4);
+          background: var(--fgc-accent-gradient);
+          border-color: var(--fgc-accent-secondary);
         }
         
         .item-top { display: flex; align-items: center; gap: 10px; }
@@ -816,22 +1371,22 @@ class FavoritesGridCard extends HTMLElement {
           width: 36px;
           height: 36px;
           border-radius: 50%;
-          background: rgba(255,255,255,0.1);
+          background: var(--fgc-icon-bg);
           display: flex;
           align-items: center;
           justify-content: center;
           flex-shrink: 0;
         }
         .standard-item.is-on .icon-wrap {
-          background: linear-gradient(135deg, #00897b, #00acc1);
+          background: var(--fgc-accent-gradient);
           box-shadow: 0 2px 8px rgba(0,172,193,0.4);
         }
-        .standard-item .icon-wrap ha-icon { color: rgba(255,255,255,0.8); --mdc-icon-size: 20px; }
+        .standard-item .icon-wrap ha-icon { color: var(--fgc-icon-color); --mdc-icon-size: 20px; }
         .standard-item.is-on .icon-wrap ha-icon { color: white; }
         
         .item-info { flex: 1; min-width: 0; }
-        .name { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .state { font-size: 11px; color: rgba(255,255,255,0.5); text-transform: capitalize; }
+        .name { font-size: 13px; font-weight: 500; color: var(--fgc-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .state { font-size: 11px; color: var(--fgc-text-secondary); text-transform: capitalize; }
         .standard-item.is-on .state { color: rgba(0,230,200,0.9); }
         
         /* ========== CLIMATE ITEM (4 rows) ========== */
@@ -842,7 +1397,7 @@ class FavoritesGridCard extends HTMLElement {
           flex-direction: column;
           gap: 10px;
           cursor: ${allowReorder ? 'grab' : 'default'};
-          height: fit-content;
+          height: 100%;
           align-self: start;
         }
         
@@ -860,7 +1415,6 @@ class FavoritesGridCard extends HTMLElement {
           min-width: 0;
         }
         
-        /* Climate icon button with dropdown container */
         .climate-icon-wrap {
           position: relative;
           z-index: 100;
@@ -871,7 +1425,7 @@ class FavoritesGridCard extends HTMLElement {
           height: 36px;
           border-radius: 12px;
           border: none;
-          background: rgba(255,255,255,0.1);
+          background: var(--fgc-icon-bg);
           cursor: pointer;
           display: flex;
           align-items: center;
@@ -880,15 +1434,14 @@ class FavoritesGridCard extends HTMLElement {
           flex-shrink: 0;
         }
         .climate-icon-btn:hover {
-          background: rgba(255,255,255,0.15);
+          background: var(--fgc-button-hover-bg);
           transform: scale(1.05);
         }
         .climate-icon-btn ha-icon {
-          color: rgba(255,255,255,0.7);
+          color: var(--fgc-icon-color);
           --mdc-icon-size: 20px;
         }
         
-        /* Climate ON state - BRIGHTER */
         .climate-item.is-on .climate-icon-btn {
           background: linear-gradient(135deg, #00bfa5, #00e5cc);
           box-shadow: 0 4px 16px rgba(0, 230, 200, 0.5);
@@ -896,8 +1449,8 @@ class FavoritesGridCard extends HTMLElement {
         .climate-item.is-on .climate-icon-btn ha-icon { color: white; }
         
         .climate-item.is-cooling {
-          background: linear-gradient(135deg, rgba(40, 45, 50, 0.7), rgba(0, 180, 220, 0.25));
-          border-color: rgba(0, 200, 240, 0.4);
+          background: var(--fgc-climate-cool-bg);
+          border-color: var(--fgc-climate-cool-border);
           box-shadow: 0 4px 20px rgba(0, 180, 220, 0.15), inset 0 1px 0 rgba(255,255,255,0.08);
         }
         
@@ -906,8 +1459,8 @@ class FavoritesGridCard extends HTMLElement {
           box-shadow: 0 4px 16px rgba(255, 160, 60, 0.5);
         }
         .climate-item.is-heating {
-          background: linear-gradient(135deg, rgba(45, 40, 35, 0.7), rgba(255, 160, 60, 0.2));
-          border-color: rgba(255, 170, 70, 0.4);
+          background: var(--fgc-climate-heat-bg);
+          border-color: var(--fgc-climate-heat-border);
           box-shadow: 0 4px 20px rgba(255, 140, 40, 0.15), inset 0 1px 0 rgba(255,255,255,0.08);
         }
         
@@ -921,26 +1474,26 @@ class FavoritesGridCard extends HTMLElement {
         .climate-name {
           font-size: 13px;
           font-weight: 500;
-          color: rgba(255,255,255,0.9);
+          color: var(--fgc-text-primary);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
         }
         .climate-mode {
           font-size: 11px;
-          color: rgba(255,255,255,0.5);
+          color: var(--fgc-text-secondary);
           text-transform: capitalize;
         }
         .climate-item.is-on .climate-mode { color: rgba(0, 240, 210, 1); }
         .climate-item.is-heating .climate-mode { color: rgba(255, 200, 120, 1); }
         
-        /* ========== HVAC DROPDOWN - HIGH Z-INDEX ========== */
+        /* ========== HVAC DROPDOWN ========== */
         .hvac-dropdown {
           position: absolute;
           top: calc(100% + 6px);
           left: 0;
-          background: rgba(25, 25, 30, 0.98);
-          border: 1px solid rgba(255,255,255,0.15);
+          background: var(--fgc-dropdown-bg);
+          border: 1px solid var(--fgc-dropdown-border);
           border-radius: 12px;
           padding: 6px;
           min-width: 120px;
@@ -966,20 +1519,20 @@ class FavoritesGridCard extends HTMLElement {
           cursor: pointer;
           transition: background 0.15s;
           font-size: 12px;
-          color: rgba(255,255,255,0.85);
+          color: var(--fgc-text-primary);
         }
-        .hvac-option:hover { background: rgba(255,255,255,0.1); }
+        .hvac-option:hover { background: var(--fgc-button-hover-bg); }
         .hvac-option.active { 
           background: rgba(0, 200, 180, 0.3); 
-          color: #00ffd5;
+          color: var(--fgc-accent-secondary);
         }
         .hvac-option ha-icon {
           --mdc-icon-size: 16px;
-          color: rgba(255,255,255,0.6);
+          color: var(--fgc-text-secondary);
         }
-        .hvac-option.active ha-icon { color: #00ffd5; }
+        .hvac-option.active ha-icon { color: var(--fgc-accent-secondary); }
         
-        /* ========== FAN MODE BUTTON (top right) ========== */
+        /* ========== FAN MODE BUTTON ========== */
         .fan-mode-wrap {
           position: absolute;
           top: 8px;
@@ -996,7 +1549,7 @@ class FavoritesGridCard extends HTMLElement {
           height: 32px;
           border-radius: 10px;
           border: none;
-          background: rgba(255,255,255,0.1);
+          background: var(--fgc-button-bg);
           cursor: pointer;
           display: flex;
           align-items: center;
@@ -1004,16 +1557,15 @@ class FavoritesGridCard extends HTMLElement {
           transition: all 0.2s;
         }
         .fan-mode-btn:hover {
-          background: rgba(255,255,255,0.2);
+          background: var(--fgc-button-hover-bg);
           transform: scale(1.08);
         }
         .fan-mode-btn:active { transform: scale(0.95); }
         .fan-mode-btn ha-icon {
-          color: rgba(255,255,255,0.6);
+          color: var(--fgc-text-secondary);
           --mdc-icon-size: 18px;
         }
         
-        /* Fan button active when climate is on */
         .climate-item.is-on .fan-mode-btn {
           background: rgba(0, 200, 180, 0.25);
           border: 1px solid rgba(0, 200, 180, 0.4);
@@ -1043,8 +1595,8 @@ class FavoritesGridCard extends HTMLElement {
           position: absolute;
           top: calc(100% + 6px);
           right: 0;
-          background: rgba(25, 25, 30, 0.98);
-          border: 1px solid rgba(255,255,255,0.15);
+          background: var(--fgc-dropdown-bg);
+          border: 1px solid var(--fgc-dropdown-border);
           border-radius: 12px;
           padding: 6px;
           min-width: 110px;
@@ -1070,30 +1622,33 @@ class FavoritesGridCard extends HTMLElement {
           cursor: pointer;
           transition: background 0.15s;
           font-size: 12px;
-          color: rgba(255,255,255,0.85);
+          color: var(--fgc-text-primary);
         }
-        .fan-option:hover { background: rgba(255,255,255,0.1); }
+        .fan-option:hover { background: var(--fgc-button-hover-bg); }
         .fan-option.active { 
           background: rgba(0, 200, 180, 0.3); 
-          color: #00ffd5;
+          color: var(--fgc-accent-secondary);
         }
         .fan-option ha-icon {
           --mdc-icon-size: 16px;
-          color: rgba(255,255,255,0.6);
+          color: var(--fgc-text-secondary);
         }
-        .fan-option.active ha-icon { color: #00ffd5; }
+        .fan-option.active ha-icon { color: var(--fgc-accent-secondary); }
         
         /* ========== CLIMATE CONTROLS ========== */
         .climate-controls {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          background: rgba(0,0,0,0.3);
+          background: var(--fgc-control-bg);
           border-radius: 12px;
           padding: 8px 10px;
           gap: 8px;
           position: relative;
           z-index: 1;
+          margin-top: auto;
+          width: 100%;
+          box-sizing: border-box;
         }
         
         .climate-controls.disabled {
@@ -1106,8 +1661,8 @@ class FavoritesGridCard extends HTMLElement {
           height: 32px;
           border: none;
           border-radius: 10px;
-          background: rgba(255,255,255,0.1);
-          color: rgba(255,255,255,0.7);
+          background: var(--fgc-button-bg);
+          color: var(--fgc-icon-color);
           font-size: 18px;
           font-weight: 600;
           cursor: pointer;
@@ -1117,8 +1672,8 @@ class FavoritesGridCard extends HTMLElement {
           transition: all 0.15s;
         }
         .temp-btn:hover { 
-          background: rgba(255,255,255,0.2); 
-          color: white;
+          background: var(--fgc-button-hover-bg); 
+          color: var(--fgc-text-primary);
           transform: scale(1.08);
         }
         .temp-btn:active { transform: scale(0.95); }
@@ -1140,20 +1695,20 @@ class FavoritesGridCard extends HTMLElement {
           left: 8px;
           right: 8px;
           height: 4px;
-          background: rgba(255,255,255,0.12);
+          background: var(--fgc-icon-bg);
           border-radius: 2px;
         }
         
         .climate-temp {
           font-size: 18px;
           font-weight: 700;
-          color: rgba(255,255,255,0.85);
+          color: var(--fgc-text-primary);
           position: relative;
           z-index: 2;
           text-shadow: 0 2px 8px rgba(0,0,0,0.4);
         }
-        .climate-item.is-on .climate-temp { color: white; }
-        .climate-controls.disabled .climate-temp { color: rgba(255,255,255,0.35); }
+        .climate-item.is-on .climate-temp { color: var(--fgc-text-primary); }
+        .climate-controls.disabled .climate-temp { color: var(--fgc-text-tertiary); }
         
         /* ========== LONG PRESS RENAME ========== */
         .item.long-press-glow {
@@ -1192,8 +1747,8 @@ class FavoritesGridCard extends HTMLElement {
         }
         
         .rename-popup {
-          background: rgba(30, 30, 35, 0.98);
-          border: 1px solid rgba(255, 255, 255, 0.15);
+          background: var(--fgc-dropdown-bg);
+          border: 1px solid var(--fgc-dropdown-border);
           border-radius: 20px;
           padding: 20px;
           width: 280px;
@@ -1209,7 +1764,7 @@ class FavoritesGridCard extends HTMLElement {
         .rename-title {
           font-size: 14px;
           font-weight: 600;
-          color: rgba(255, 255, 255, 0.9);
+          color: var(--fgc-text-primary);
           margin-bottom: 16px;
           text-align: center;
         }
@@ -1217,21 +1772,21 @@ class FavoritesGridCard extends HTMLElement {
         .rename-input {
           width: 100%;
           padding: 12px 14px;
-          border: 1px solid rgba(255, 255, 255, 0.15);
+          border: 1px solid var(--fgc-dropdown-border);
           border-radius: 12px;
-          background: rgba(255, 255, 255, 0.08);
-          color: white;
+          background: var(--fgc-item-bg);
+          color: var(--fgc-text-primary);
           font-size: 15px;
           outline: none;
           transition: border-color 0.2s, box-shadow 0.2s;
           box-sizing: border-box;
         }
         .rename-input:focus {
-          border-color: rgba(0, 200, 180, 0.5);
-          box-shadow: 0 0 0 3px rgba(0, 200, 180, 0.15);
+          border-color: var(--fgc-accent-primary);
+          box-shadow: 0 0 0 3px rgba(0, 137, 123, 0.15);
         }
         .rename-input::placeholder {
-          color: rgba(255, 255, 255, 0.35);
+          color: var(--fgc-text-tertiary);
         }
         
         .rename-buttons {
@@ -1252,15 +1807,15 @@ class FavoritesGridCard extends HTMLElement {
         }
         
         .rename-btn.cancel {
-          background: rgba(255, 255, 255, 0.1);
-          color: rgba(255, 255, 255, 0.8);
+          background: var(--fgc-button-bg);
+          color: var(--fgc-text-primary);
         }
         .rename-btn.cancel:hover {
-          background: rgba(255, 255, 255, 0.15);
+          background: var(--fgc-button-hover-bg);
         }
         
         .rename-btn.save {
-          background: linear-gradient(135deg, #00897b, #00acc1);
+          background: var(--fgc-accent-gradient);
           color: white;
         }
         .rename-btn.save:hover {
@@ -1286,7 +1841,10 @@ class FavoritesGridCard extends HTMLElement {
         /* ========== EMPTY STATE ========== */
         .empty { text-align: center; padding: 32px 16px; }
         .empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.3; }
-        .empty-text { color: rgba(255,255,255,0.5); font-size: 13px; }
+        .empty-text { color: var(--fgc-text-secondary); font-size: 13px; }
+        
+        /* ========== CUSTOM CARD-MOD STYLES ========== */
+        ${customStyle}
       </style>
       
       <div class="card">
@@ -1309,7 +1867,6 @@ class FavoritesGridCard extends HTMLElement {
         `}
       </div>
       
-      <!-- Rename Popup -->
       <div class="rename-overlay">
         <div class="rename-popup">
           <div class="rename-title">Rename</div>
@@ -1437,7 +1994,6 @@ class FavoritesGridCard extends HTMLElement {
     const allowReorder = this._config.allow_reorder !== false;
     const showControls = this._config.show_cover_controls !== false;
     
-    // Determine position display
     let positionText = state;
     if (position !== undefined) {
       positionText = `${position}%`;
@@ -1484,14 +2040,6 @@ class FavoritesGridCard extends HTMLElement {
         ` : ''}
       </div>
     `;
-  }
-
-  _getCoverIcon(state, position) {
-    if (state === 'opening') return 'mdi:arrow-up-box';
-    if (state === 'closing') return 'mdi:arrow-down-box';
-    if (state === 'closed' || position === 0) return 'mdi:blinds';
-    if (position !== undefined && position < 100) return 'mdi:blinds-open';
-    return 'mdi:blinds-open';
   }
 
   _renderStandardItem(fav, entity) {
@@ -1633,7 +2181,6 @@ class FavoritesGridCard extends HTMLElement {
   // LONG PRESS TO RENAME
   // ============================================
   _handlePointerDown(e, el) {
-    // Ignore if clicking on buttons/controls
     if (e.target.closest('button') || e.target.closest('.hvac-dropdown') || e.target.closest('.fan-dropdown')) {
       return;
     }
@@ -1645,45 +2192,40 @@ class FavoritesGridCard extends HTMLElement {
     this._longPressEntity = entityId;
     this._isLongPressing = false;
     
-    // Start glow animation at 1.5 seconds
     this._longPressGlowTimer = setTimeout(() => {
       el.classList.add('long-press-glow');
-      // Haptic feedback if available
       if (navigator.vibrate) {
         navigator.vibrate(30);
       }
-    }, 1500);
+    }, 1000);
     
-    // Trigger rename at 2 seconds
     this._longPressTimer = setTimeout(() => {
       this._isLongPressing = true;
       el.classList.remove('long-press-glow');
       
-      // Stronger haptic feedback
       if (navigator.vibrate) {
         navigator.vibrate([50, 30, 50]);
       }
       
       this._showRenamePopup(entityId);
-    }, 2000);
+    }, 4000);
   }
-  
+   
   _handlePointerMove(e) {
     if (!this._longPressStartPos) return;
     
     const dx = Math.abs(e.clientX - this._longPressStartPos.x);
     const dy = Math.abs(e.clientY - this._longPressStartPos.y);
     
-    // If moved more than 10px, cancel long press (allow drag)
     if (dx > 10 || dy > 10) {
       this._cancelLongPress();
     }
   }
-  
+   
   _handlePointerUp(e) {
     this._cancelLongPress();
   }
-  
+   
   _cancelLongPress() {
     if (this._longPressTimer) {
       clearTimeout(this._longPressTimer);
@@ -1694,7 +2236,6 @@ class FavoritesGridCard extends HTMLElement {
       this._longPressGlowTimer = null;
     }
     
-    // Remove glow from all items
     this.shadowRoot.querySelectorAll('.item.long-press-glow').forEach(el => {
       el.classList.remove('long-press-glow');
     });
@@ -1702,11 +2243,10 @@ class FavoritesGridCard extends HTMLElement {
     this._longPressStartPos = null;
     this._longPressEntity = null;
   }
-  
+   
   _showRenamePopup(entityId) {
     this._renameEntityId = entityId;
     
-    // Get current name
     const fav = this._favorites.find(f => f.entity_id === entityId);
     const entity = this._hass?.states[entityId];
     const currentName = fav?.custom_name || entity?.attributes?.friendly_name || entityId.split('.')[1].replace(/_/g, ' ');
@@ -1721,11 +2261,10 @@ class FavoritesGridCard extends HTMLElement {
     
     if (overlay) {
       overlay.classList.add('show');
-      // Focus input after animation
       setTimeout(() => input?.focus(), 200);
     }
   }
-  
+   
   _hideRenamePopup() {
     const overlay = this.shadowRoot.querySelector('.rename-overlay');
     if (overlay) {
@@ -1734,7 +2273,7 @@ class FavoritesGridCard extends HTMLElement {
     this._renameEntityId = null;
     this._isLongPressing = false;
   }
-  
+   
   async _saveRename() {
     if (!this._renameEntityId || !this._hass || !this._userId) {
       this._hideRenamePopup();
@@ -1749,17 +2288,14 @@ class FavoritesGridCard extends HTMLElement {
       return;
     }
     
-    // Update local state immediately for instant feedback
     const fav = this._favorites.find(f => f.entity_id === this._renameEntityId);
     if (fav) {
       fav.custom_name = newName;
-      // Update the name in DOM
       const item = this.shadowRoot.querySelector(`[data-entity="${this._renameEntityId}"]`);
       const nameEl = item?.querySelector('.name, .climate-name, .cover-name');
       if (nameEl) nameEl.textContent = newName;
     }
     
-    // Call service
     try {
       await this._hass.callService('favorites', 'update', {
         user_id: this._userId,
@@ -1772,27 +2308,24 @@ class FavoritesGridCard extends HTMLElement {
     
     this._hideRenamePopup();
   }
-  
+   
   async _resetRename() {
     if (!this._renameEntityId || !this._hass || !this._userId) {
       this._hideRenamePopup();
       return;
     }
     
-    // Update local state - reset to null
     const fav = this._favorites.find(f => f.entity_id === this._renameEntityId);
     const entity = this._hass?.states[this._renameEntityId];
     const defaultName = entity?.attributes?.friendly_name || this._renameEntityId.split('.')[1].replace(/_/g, ' ');
     
     if (fav) {
       fav.custom_name = null;
-      // Update the name in DOM
       const item = this.shadowRoot.querySelector(`[data-entity="${this._renameEntityId}"]`);
       const nameEl = item?.querySelector('.name, .climate-name, .cover-name');
       if (nameEl) nameEl.textContent = defaultName;
     }
     
-    // Call service with null to reset
     try {
       await this._hass.callService('favorites', 'update', {
         user_id: this._userId,
@@ -1814,8 +2347,16 @@ class FavoritesGridCard extends HTMLElement {
 if (!customElements.get('favorites-grid-card')) {
   customElements.define('favorites-grid-card', FavoritesGridCard);
 }
+
 window.customCards = window.customCards || [];
 if (!window.customCards.find(c => c.type === 'favorites-grid-card')) {
-  window.customCards.push({ type: 'favorites-grid-card', name: 'Favorites Grid Card', description: 'Displays favorites with climate controls, light styling, and drag-drop reorder' });
+  window.customCards.push({ 
+    type: 'favorites-grid-card', 
+    name: 'Favorites Grid Card', 
+    description: 'Displays favorites with theme support, climate controls, light styling, and drag-drop reorder',
+    preview: true,
+    documentationURL: 'https://github.com/your-repo/favorites-grid-card',
+  });
 }
-console.info('%c FAVORITES-GRID-CARD %c v2.9.0 ', 'background: #00897b; color: white; font-weight: bold;', 'background: #00acc1; color: white;');
+
+console.info('%c FAVORITES-GRID-CARD %c v3.0.0 ', 'background: #00897b; color: white; font-weight: bold;', 'background: #00acc1; color: white;');
