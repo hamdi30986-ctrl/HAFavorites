@@ -71,7 +71,7 @@ class FavoritesStore:
             self._data = {"users": {}}
 
     async def async_save(self) -> None:
-        """Save data to storage."""
+        """Save data from storage."""
         await self._store.async_save(self._data)
 
     @property
