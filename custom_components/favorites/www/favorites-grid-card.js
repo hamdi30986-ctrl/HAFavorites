@@ -249,7 +249,7 @@ class FavoritesGridCardEditor extends HTMLElement {
         <textarea id="card_mod_style" rows="4" style="width: 100%; padding: 10px 12px; border: 1px solid var(--divider-color, rgba(255,255,255,0.12)); border-radius: 8px; background: var(--card-background-color, rgba(255,255,255,0.05)); color: var(--primary-text-color); font-family: monospace; font-size: 12px; resize: vertical;">${this._config.card_mod?.style || ''}</textarea>
       </div>
     `;
-    
+
     this._attachListeners();
   }
 
@@ -261,7 +261,7 @@ class FavoritesGridCardEditor extends HTMLElement {
         this._render();
       });
     });
-    
+
     // Text inputs
     ['title', 'empty_message'].forEach(id => {
       const input = this.shadowRoot.getElementById(id);
@@ -271,7 +271,7 @@ class FavoritesGridCardEditor extends HTMLElement {
         });
       }
     });
-    
+
     // Number inputs
     ['columns'].forEach(id => {
       const input = this.shadowRoot.getElementById(id);
@@ -281,7 +281,7 @@ class FavoritesGridCardEditor extends HTMLElement {
         });
       }
     });
-    
+
     // Checkboxes
     ['show_empty_message', 'show_climate_controls', 'show_cover_controls', 'light_compact', 'allow_reorder'].forEach(id => {
       const input = this.shadowRoot.getElementById(id);
@@ -291,7 +291,7 @@ class FavoritesGridCardEditor extends HTMLElement {
         });
       }
     });
-    
+
     // Custom CSS
     const cssInput = this.shadowRoot.getElementById('card_mod_style');
     if (cssInput) {
@@ -344,7 +344,7 @@ class FavoritesGridCard extends HTMLElement {
     this._openFanDropdownId = null;
     this._draggedItem = null;
     this._userId = null;
-    
+
     // Long-press rename properties
     this._longPressTimer = null;
     this._longPressGlowTimer = null;
@@ -378,7 +378,7 @@ class FavoritesGridCard extends HTMLElement {
   // ============================================
   _getThemeStyles() {
     const theme = this._config.theme || 'dark';
-    
+
     const themes = {
       dark: `
         /* Dark Frosted Glass Theme */
@@ -425,7 +425,7 @@ class FavoritesGridCard extends HTMLElement {
         --fgc-cover-open-bg: linear-gradient(135deg, rgba(92, 107, 192, 0.25), rgba(121, 134, 203, 0.15));
         --fgc-cover-open-border: rgba(92, 107, 192, 0.4);
       `,
-      
+
       light: `
         /* Light Frosted Glass Theme */
         --fgc-card-bg: rgba(255, 255, 255, 0.75);
@@ -471,7 +471,7 @@ class FavoritesGridCard extends HTMLElement {
         --fgc-cover-open-bg: linear-gradient(135deg, rgba(232, 234, 246, 0.9), rgba(197, 202, 233, 0.6));
         --fgc-cover-open-border: rgba(92, 107, 192, 0.3);
       `,
-      
+
       liquid: `
         /* Liquid Glass Theme (50% transparency) */
         --fgc-card-bg: rgba(255, 255, 255, 0.12);
@@ -517,7 +517,7 @@ class FavoritesGridCard extends HTMLElement {
         --fgc-cover-open-bg: linear-gradient(135deg, rgba(92, 107, 192, 0.2), rgba(121, 134, 203, 0.1));
         --fgc-cover-open-border: rgba(92, 107, 192, 0.4);
       `,
-      
+
       native: `
         /* Native Home Assistant Theme */
         --fgc-card-bg: var(--ha-card-background, var(--card-background-color, #fff));
@@ -564,7 +564,7 @@ class FavoritesGridCard extends HTMLElement {
         --fgc-cover-open-border: var(--state-cover-open-color, rgba(63, 81, 181, 0.3));
       `,
     };
-    
+
     return themes[theme] || themes.dark;
   }
 
@@ -573,18 +573,18 @@ class FavoritesGridCard extends HTMLElement {
   // ============================================
   connectedCallback() {
     this._lastSensorIds = '';
-    
+
     if (this._hass) {
       this._syncFromSensor();
     }
-    
+
     this._handleUpdate = (e) => {
       const { entity_id, isFavorite, user_id } = e.detail;
-      
+
       if (user_id && this._userId && user_id !== this._userId) {
         return;
       }
-      
+
       if (isFavorite) {
         if (!this._entityIds.has(entity_id)) {
           this._entityIds.add(entity_id);
@@ -604,9 +604,9 @@ class FavoritesGridCard extends HTMLElement {
         }
       }
     };
-    
+
     window.addEventListener('favorites-updated', this._handleUpdate);
-    
+
     this._handleDocClick = (e) => {
       if (this._openDropdownId && !e.target.closest('.climate-icon-btn')) {
         this._closeDropdown();
@@ -647,12 +647,12 @@ class FavoritesGridCard extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     this._userId = hass.user?.id || null;
-    
+
     const sensor = hass.states['sensor.favorites_list'];
     const users = sensor?.attributes?.users || {};
     const userItems = this._userId ? (users[this._userId] || []) : [];
     const sensorIds = JSON.stringify(userItems.map(item => item.entity_id));
-    
+
     if (sensorIds !== this._lastSensorIds) {
       this._lastSensorIds = sensorIds;
       this._syncFromSensor();
@@ -663,7 +663,7 @@ class FavoritesGridCard extends HTMLElement {
 
   _syncFromSensor() {
     if (!this._hass) return;
-    
+
     const sensor = this._hass.states['sensor.favorites_list'];
     const users = sensor?.attributes?.users || {};
     const userItems = this._userId ? (users[this._userId] || []) : [];
@@ -674,12 +674,12 @@ class FavoritesGridCard extends HTMLElement {
 
   _smartRender() {
     const newKey = this._favorites.map(f => f.entity_id).join(',') + '_' + (this._config.theme || 'dark');
-    
+
     if (newKey === this._renderedKey && !this._isFirstRender) {
       this._updateStates();
       return;
     }
-    
+
     this._renderedKey = newKey;
     this._isFirstRender = false;
     this._render();
@@ -692,44 +692,50 @@ class FavoritesGridCard extends HTMLElement {
       if (!item || !entity) return;
 
       const domain = fav.entity_id.split('.')[0];
-      
+
       if (domain === 'climate') {
         const isOn = entity.state !== 'off' && entity.state !== 'unavailable';
         const mode = entity.state;
         const fanMode = entity.attributes?.fan_mode;
         const fanModes = entity.attributes?.fan_modes || [];
-        
+
         item.classList.toggle('is-on', isOn);
         item.classList.toggle('is-cooling', mode === 'cool');
         item.classList.toggle('is-heating', mode === 'heat');
         item.classList.toggle('is-off', !isOn);
-        
-        const modeEl = item.querySelector('.climate-mode');
+
+        const modeEl = item.querySelector('.climate-center-state');
         if (modeEl) {
-          modeEl.textContent = isOn && fanModes.length > 0 && fanMode 
-            ? `${mode} · ${fanMode}` 
-            : (mode || 'off');
+          let stateLabel = mode;
+          if (isOn) {
+            if (fanModes.length > 0 && fanMode) {
+              stateLabel = `${mode} · ${fanMode}`;
+            }
+          } else {
+            stateLabel = 'Off';
+          }
+          modeEl.textContent = stateLabel;
         }
-        
+
         const iconEl = item.querySelector('.climate-icon-btn ha-icon');
         if (iconEl) iconEl.setAttribute('icon', this._getClimateIcon(mode));
-        
+
         const tempEl = item.querySelector('.climate-temp');
         if (tempEl) {
           const temp = entity.attributes?.temperature;
           tempEl.textContent = isOn && temp ? `${temp}°` : '--';
         }
-        
+
         const controls = item.querySelector('.climate-controls');
         if (controls) {
           controls.classList.toggle('disabled', !isOn);
         }
-        
+
         const fanWrap = item.querySelector('.fan-mode-wrap');
         if (fanWrap) {
           fanWrap.classList.toggle('disabled', !isOn);
         }
-        
+
         const fanIconEl = item.querySelector('.fan-mode-btn ha-icon');
         if (fanIconEl && fanMode) {
           fanIconEl.setAttribute('icon', this._getFanIcon(fanMode));
@@ -737,45 +743,65 @@ class FavoritesGridCard extends HTMLElement {
       } else if (domain === 'light') {
         const isOn = entity.state === 'on';
         item.classList.toggle('is-on', isOn);
-        
+
         const stateEl = item.querySelector('.state');
         if (stateEl) stateEl.textContent = isOn ? 'On' : 'Off';
       } else if (domain === 'cover') {
         const state = entity.state;
         const position = entity.attributes?.current_position;
-        const isOpen = state === 'open' || (position !== undefined && position > 0);
-        const isClosed = state === 'closed' || position === 0;
+
+        // Robust state determination
+        const isClosed = state === 'closed';
         const isMoving = state === 'opening' || state === 'closing';
-        
-        item.classList.toggle('is-open', isOpen && !isMoving);
-        item.classList.toggle('is-closed', isClosed && !isMoving);
+        const isOpen = !isClosed && !isMoving && state !== 'unavailable';
+
+        item.classList.toggle('is-open', isOpen);
+        item.classList.toggle('is-closed', isClosed);
         item.classList.toggle('is-moving', isMoving);
-        
-        const stateEl = item.querySelector('.cover-state');
-        if (stateEl) {
-          if (position !== undefined) {
-            stateEl.textContent = `${position}%`;
+
+        // Update status text (top right)
+        const statusTextEl = item.querySelector('.cover-status-text');
+        if (statusTextEl) statusTextEl.textContent = state;
+
+        // Update center large state text
+        const centerStateEl = item.querySelector('.cover-center-state');
+        if (centerStateEl) {
+          let stateLabel = state;
+          if (isClosed) {
+            stateLabel = 'Closed';
+          } else if (isMoving) {
+            stateLabel = state === 'opening' ? 'Opening' : 'Closing';
+          } else if (isOpen) {
+            if (position !== undefined && position !== null && typeof position === 'number') {
+              stateLabel = position === 100 ? 'Open' : position === 0 ? 'Closed' : `${Math.round(position)}%`;
+            } else {
+              stateLabel = 'Open';
+            }
           } else {
-            stateEl.textContent = state || 'unavailable';
+            stateLabel = state.charAt(0).toUpperCase() + state.slice(1);
           }
+          centerStateEl.textContent = stateLabel;
         }
-        
+
         const iconEl = item.querySelector('.cover-icon-wrap ha-icon');
         if (iconEl) iconEl.setAttribute('icon', this._getCoverIcon(state, position));
-        
-        const fillEl = item.querySelector('.cover-position-fill');
-        if (fillEl && position !== undefined) {
-          fillEl.style.width = `${position}%`;
-        }
+
+        // Update button disabled states
+        const isFullyOpen = position === 100 || (position === undefined && state === 'open');
+        const closeBtn = item.querySelector('.cover-control-btn.close');
+        const openBtn = item.querySelector('.cover-control-btn.open');
+
+        if (closeBtn) closeBtn.classList.toggle('disabled', isClosed);
+        if (openBtn) openBtn.classList.toggle('disabled', isFullyOpen);
       } else {
-        const isOn = ['on','home','playing','open','unlocked'].includes(entity.state);
+        const isOn = ['on', 'home', 'playing', 'open', 'unlocked'].includes(entity.state);
         item.classList.toggle('is-on', isOn);
-        
+
         const stateEl = item.querySelector('.state');
         if (stateEl) stateEl.textContent = entity.state || 'unavailable';
       }
     });
-    
+
     const countEl = this.shadowRoot?.querySelector('.count');
     if (countEl) countEl.textContent = `${this._favorites.length} items`;
   }
@@ -830,17 +856,17 @@ class FavoritesGridCard extends HTMLElement {
 
   _toggleFanDropdown(entityId, e) {
     e.stopPropagation();
-    
+
     const item = this.shadowRoot.querySelector(`[data-entity="${entityId}"]`);
     const dropdown = item?.querySelector('.fan-dropdown');
-    
+
     if (this._openFanDropdownId === entityId) {
       dropdown?.classList.remove('show');
       this._openFanDropdownId = null;
     } else {
       this._closeDropdown();
       this._closeFanDropdown();
-      
+
       this._openFanDropdownId = entityId;
       dropdown?.classList.add('show');
     }
@@ -858,7 +884,7 @@ class FavoritesGridCard extends HTMLElement {
   async _setFanMode(entityId, fanMode, e) {
     e.stopPropagation();
     this._closeFanDropdown();
-    
+
     await this._hass.callService('climate', 'set_fan_mode', {
       entity_id: entityId,
       fan_mode: fanMode,
@@ -867,14 +893,14 @@ class FavoritesGridCard extends HTMLElement {
 
   _toggleClimateDropdown(entityId, e) {
     e.stopPropagation();
-    
+
     if (this._openDropdownId === entityId) {
       this._closeDropdown();
     } else {
       this._closeDropdown();
       this._closeFanDropdown();
       this._openDropdownId = entityId;
-      
+
       const item = this.shadowRoot.querySelector(`[data-entity="${entityId}"]`);
       const dropdown = item?.querySelector('.hvac-dropdown');
       if (dropdown) {
@@ -897,7 +923,7 @@ class FavoritesGridCard extends HTMLElement {
   async _setHvacMode(entityId, mode, e) {
     e.stopPropagation();
     this._closeDropdown();
-    
+
     await this._hass.callService('climate', 'set_hvac_mode', {
       entity_id: entityId,
       hvac_mode: mode,
@@ -906,21 +932,21 @@ class FavoritesGridCard extends HTMLElement {
 
   async _climateSetTemp(entityId, delta, e) {
     e.stopPropagation();
-    
+
     const entity = this._hass?.states[entityId];
     if (!entity || entity.state === 'off') return;
-    
+
     const currentTemp = entity.attributes?.temperature || 22;
     const minTemp = entity.attributes?.min_temp || 16;
     const maxTemp = entity.attributes?.max_temp || 30;
     const step = entity.attributes?.target_temp_step || 1;
-    
+
     let newTemp = currentTemp + (delta * step);
     newTemp = Math.max(minTemp, Math.min(maxTemp, newTemp));
-    
+
     const tempEl = this.shadowRoot.querySelector(`[data-entity="${entityId}"] .climate-temp`);
     if (tempEl) tempEl.textContent = `${newTemp}°`;
-    
+
     await this._hass.callService('climate', 'set_temperature', {
       entity_id: entityId,
       temperature: newTemp,
@@ -972,7 +998,7 @@ class FavoritesGridCard extends HTMLElement {
   _handleDragEnd(e) {
     e.target.classList.remove('dragging');
     this._draggedItem = null;
-    
+
     this.shadowRoot.querySelectorAll('.drag-over').forEach(el => {
       el.classList.remove('drag-over');
     });
@@ -981,7 +1007,7 @@ class FavoritesGridCard extends HTMLElement {
   _handleDragOver(e, entityId) {
     e.preventDefault();
     if (this._draggedItem === entityId) return;
-    
+
     const item = this.shadowRoot.querySelector(`[data-entity="${entityId}"]`);
     if (item && !item.classList.contains('dragging')) {
       this.shadowRoot.querySelectorAll('.drag-over').forEach(el => {
@@ -993,22 +1019,22 @@ class FavoritesGridCard extends HTMLElement {
 
   _handleDrop(e, targetEntityId) {
     e.preventDefault();
-    
+
     if (!this._draggedItem || this._draggedItem === targetEntityId) return;
-    
+
     const draggedIndex = this._favorites.findIndex(f => f.entity_id === this._draggedItem);
     const targetIndex = this._favorites.findIndex(f => f.entity_id === targetEntityId);
-    
+
     if (draggedIndex === -1 || targetIndex === -1) return;
-    
+
     const [draggedFav] = this._favorites.splice(draggedIndex, 1);
     this._favorites.splice(targetIndex, 0, draggedFav);
-    
+
     this._renderedKey = '';
     this._smartRender();
-    
+
     const newOrder = this._favorites.map(f => f.entity_id);
-    this._hass.callService('favorites', 'reorder', { 
+    this._hass.callService('favorites', 'reorder', {
       entity_ids: newOrder,
       user_id: this._userId
     });
@@ -1019,19 +1045,19 @@ class FavoritesGridCard extends HTMLElement {
   // ============================================
   async _removeFavorite(entityId, e) {
     e.stopPropagation();
-    
+
     const item = this.shadowRoot.querySelector(`[data-entity="${entityId}"]`);
     if (item) {
       item.classList.add('removing');
       await new Promise(r => setTimeout(r, 200));
     }
-    
+
     this._entityIds.delete(entityId);
     this._favorites = this._favorites.filter(f => f.entity_id !== entityId);
     this._lastSensorIds = JSON.stringify(Array.from(this._entityIds));
     this._smartRender();
-    
-    await this._hass.callService('favorites', 'remove', { 
+
+    await this._hass.callService('favorites', 'remove', {
       entity_id: entityId,
       user_id: this._userId
     });
@@ -1048,7 +1074,7 @@ class FavoritesGridCard extends HTMLElement {
     const entity = this._hass?.states[fav.entity_id];
     if (fav.custom_icon) return fav.custom_icon;
     if (entity?.attributes?.icon) return entity.attributes.icon;
-    
+
     const domain = fav.entity_id.split('.')[0];
     const icons = {
       light: 'mdi:lightbulb',
@@ -1077,7 +1103,7 @@ class FavoritesGridCard extends HTMLElement {
     const cols = this._config.columns || 2;
     const allowReorder = this._config.allow_reorder !== false;
     const customStyle = this._config.card_mod?.style || '';
-    
+
     this.shadowRoot.innerHTML = `
       <style>
         /* ========== THEME VARIABLES ========== */
@@ -1208,145 +1234,188 @@ class FavoritesGridCard extends HTMLElement {
         /* ========== COVER ITEM (4 rows) ========== */
         .cover-item {
           grid-row: span 4;
-          padding: 14px;
+          padding: 12px;
           display: flex;
           flex-direction: column;
-          gap: 10px;
+          justify-content: space-between;
+          gap: 2px;
           cursor: ${allowReorder ? 'grab' : 'default'};
           height: 100%;
           align-self: start;
         }
-        
+
+        .cover-item.is-open {
+          background: linear-gradient(135deg, rgba(25, 25, 28, 0.65), rgba(0, 137, 180, 0.15));
+          border-color: rgba(0, 172, 193, 0.3);
+        }
+
+        /* Same header structure, slightly tighter */
         .cover-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          width: 100%;
+        }
+
+        .cover-info {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          flex: 1;
+          min-width: 0;
+        }
+
+        .cover-name-row {
           display: flex;
           align-items: center;
           gap: 10px;
         }
-        
+
         .cover-icon-wrap {
-          width: 36px;
-          height: 36px;
+          width: 42px;
+          height: 42px;
           border-radius: 12px;
           background: var(--fgc-icon-bg);
           display: flex;
           align-items: center;
           justify-content: center;
+          transition: all 0.3s ease;
           flex-shrink: 0;
-          transition: all 0.2s;
         }
+        
+        .cover-item.is-open .cover-icon-wrap,
+        .cover-item.is-moving .cover-icon-wrap {
+          background: linear-gradient(135deg, #00897b, #00acc1);
+          box-shadow: 0 4px 12px rgba(0, 172, 193, 0.4);
+        }
+        
         .cover-icon-wrap ha-icon {
           color: var(--fgc-icon-color);
-          --mdc-icon-size: 20px;
+          --mdc-icon-size: 24px;
         }
         
-        .cover-item.is-open .cover-icon-wrap {
-          background: linear-gradient(135deg, #5c6bc0, #7986cb);
-          box-shadow: 0 4px 16px rgba(92, 107, 192, 0.5);
+        .cover-item.is-open .cover-icon-wrap ha-icon,
+        .cover-item.is-moving .cover-icon-wrap ha-icon {
+          color: white;
         }
-        .cover-item.is-open .cover-icon-wrap ha-icon { color: white; }
-        
-        .cover-item.is-moving .cover-icon-wrap {
-          background: linear-gradient(135deg, #ff9800, #ffb74d);
-          box-shadow: 0 4px 16px rgba(255, 152, 0, 0.5);
-          animation: pulse 1s infinite;
-        }
-        .cover-item.is-moving .cover-icon-wrap ha-icon { color: white; }
-        
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.05); }
-        }
-        
-        .cover-item.is-open {
-          background: var(--fgc-cover-open-bg);
-          border-color: var(--fgc-cover-open-border);
-          box-shadow: 0 4px 20px rgba(92, 107, 192, 0.15), inset 0 1px 0 rgba(255,255,255,0.08);
-        }
-        
-        .cover-item.is-moving {
-          background: linear-gradient(135deg, rgba(255, 152, 0, 0.2), rgba(255, 183, 77, 0.15));
-          border-color: rgba(255, 152, 0, 0.4);
-        }
-        
-        .cover-info {
-          flex: 1;
-          min-width: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
+
         .cover-name {
-          font-size: 13px;
-          font-weight: 500;
+          font-size: 14px;
+          font-weight: 600;
           color: var(--fgc-text-primary);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
         }
-        .cover-state {
-          font-size: 11px;
+        
+        .cover-status-row {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          margin-left: 52px; /* Align with text */
+        }
+        
+        .cover-status-icon {
+          --mdc-icon-size: 14px;
+          color: var(--fgc-text-secondary);
+        }
+        
+        .cover-item.is-open .cover-status-icon,
+        .cover-item.is-moving .cover-status-icon {
+          color: #00acc1;
+        }
+        
+        .cover-status-text {
+          font-size: 12px;
           color: var(--fgc-text-secondary);
           text-transform: capitalize;
         }
-        .cover-item.is-open .cover-state { color: rgba(121, 134, 203, 1); }
-        .cover-item.is-moving .cover-state { color: rgba(255, 183, 77, 1); }
         
-        /* Cover Controls */
-        .cover-controls {
+        .cover-item.is-open .cover-status-text,
+        .cover-item.is-moving .cover-status-text {
+          color: #00acc1;
+        }
+
+        /* Center state section - REDUCED SIZE */
+        .cover-center-section {
           display: flex;
+          justify-content: center;
           align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          padding: 4px 0 0 0;
+          padding: 4px 0;
+          flex-grow: 1;
+        }
+        
+        .cover-center-state {
+          font-size: 24px; /* Reduced from 42px */
+          font-weight: 700;
+          color: var(--fgc-text-primary);
+          letter-spacing: -0.5px;
+          transition: all 0.15s ease;
+          line-height: 1;
+          text-transform: capitalize;
+        }
+
+        /* Bottom Controls Container */
+        .cover-controls-container {
           margin-top: auto;
           width: 100%;
         }
         
-        .cover-btn {
-          width: 40px;
+        /* 3-Button Row */
+        .cover-controls-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          width: 100%;
+        }
+        
+        .cover-control-btn {
+          flex: 1;
           height: 40px;
-          border: none;
-          border-radius: 14px;
+          border-radius: 12px;
+          border: 1px solid var(--fgc-item-border);
           background: var(--fgc-button-bg);
-          color: var(--fgc-icon-color);
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: all 0.15s;
+          transition: all 0.2s ease;
         }
-        .cover-btn ha-icon {
-          --mdc-icon-size: 18px;
-        }
-        .cover-btn:hover { 
-          background: var(--fgc-button-hover-bg); 
-          color: var(--fgc-text-primary);
-          transform: scale(1.08);
-        }
-        .cover-btn:active { transform: scale(0.95); }
         
-        .cover-btn.up:hover { background: rgba(92, 107, 192, 0.4); }
-        .cover-btn.down:hover { background: rgba(92, 107, 192, 0.4); }
-        .cover-btn.stop:hover { background: rgba(244, 67, 54, 0.4); }
+        .cover-control-btn:hover {
+          background: var(--fgc-button-hover-bg);
+          transform: scale(1.02);
+        }
         
-        /* Cover Position Bar */
-        .cover-position {
-          padding: 0 4px;
+        .cover-control-btn:active {
+          transform: scale(0.96);
         }
-        .cover-position-track {
-          height: 4px;
-          background: var(--fgc-icon-bg);
-          border-radius: 2px;
-          overflow: hidden;
+        
+        .cover-control-btn ha-icon {
+          color: var(--fgc-icon-color);
+          --mdc-icon-size: 20px;
         }
-        .cover-position-fill {
-          height: 100%;
-          background: linear-gradient(90deg, #5c6bc0, #7986cb);
-          border-radius: 2px;
-          transition: width 0.3s ease;
+
+        /* Pause button specific styling */
+        .cover-control-btn.pause {
+          flex: 0 0 50px; /* Smaller width for pause button */
+          border-color: rgba(0, 172, 193, 0.3);
+          background: rgba(0, 172, 193, 0.1);
         }
-        .cover-item.is-moving .cover-position-fill {
-          background: linear-gradient(90deg, #ff9800, #ffb74d);
+        
+        .cover-control-btn.pause ha-icon {
+           color: #00acc1;
+        }
+        
+        .cover-control-btn.pause:hover {
+           background: rgba(0, 172, 193, 0.2);
+        }
+        
+        .cover-control-btn.disabled {
+          opacity: 0.35;
+          pointer-events: none;
+          filter: grayscale(1);
         }
         
         /* ========== STANDARD ITEM (2 rows) ========== */
@@ -1403,14 +1472,15 @@ class FavoritesGridCard extends HTMLElement {
         
         .climate-header {
           display: flex;
-          align-items: flex-start;
+          align-items: center;
           justify-content: space-between;
+          width: 100%;
         }
         
         .climate-left {
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 12px;
           flex: 1;
           min-width: 0;
         }
@@ -1421,8 +1491,8 @@ class FavoritesGridCard extends HTMLElement {
         }
         
         .climate-icon-btn {
-          width: 36px;
-          height: 36px;
+          width: 42px;
+          height: 42px;
           border-radius: 12px;
           border: none;
           background: var(--fgc-icon-bg);
@@ -1472,20 +1542,32 @@ class FavoritesGridCard extends HTMLElement {
           gap: 2px;
         }
         .climate-name {
-          font-size: 13px;
-          font-weight: 500;
+          font-size: 14px;
+          font-weight: 600;
           color: var(--fgc-text-primary);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
         }
-        .climate-mode {
-          font-size: 11px;
-          color: var(--fgc-text-secondary);
+
+        /* Center state section - New */
+        .climate-center-section {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          padding: 4px 0;
+          flex-grow: 1;
+        }
+        
+        .climate-center-state {
+          font-size: 24px;
+          font-weight: 700;
+          color: var(--fgc-text-primary);
+          letter-spacing: -0.5px;
+          transition: all 0.15s ease;
+          line-height: 1;
           text-transform: capitalize;
         }
-        .climate-item.is-on .climate-mode { color: rgba(0, 240, 210, 1); }
-        .climate-item.is-heating .climate-mode { color: rgba(255, 200, 120, 1); }
         
         /* ========== HVAC DROPDOWN ========== */
         .hvac-dropdown {
@@ -1534,9 +1616,7 @@ class FavoritesGridCard extends HTMLElement {
         
         /* ========== FAN MODE BUTTON ========== */
         .fan-mode-wrap {
-          position: absolute;
-          top: 8px;
-          right: 8px;
+          position: relative;
           z-index: 100;
         }
         .fan-mode-wrap.disabled {
@@ -1545,9 +1625,9 @@ class FavoritesGridCard extends HTMLElement {
         }
         
         .fan-mode-btn {
-          width: 32px;
-          height: 32px;
-          border-radius: 10px;
+          width: 42px;
+          height: 42px;
+          border-radius: 12px;
           border: none;
           background: var(--fgc-button-bg);
           cursor: pointer;
@@ -1881,14 +1961,14 @@ class FavoritesGridCard extends HTMLElement {
         </div>
       </div>
     `;
-    
+
     this._attachEventListeners();
   }
 
   _renderItem(fav) {
     const domain = fav.entity_id.split('.')[0];
     const entity = this._hass?.states[fav.entity_id];
-    
+
     if (domain === 'climate') {
       return this._renderClimateItem(fav, entity);
     } else if (domain === 'cover') {
@@ -1908,27 +1988,21 @@ class FavoritesGridCard extends HTMLElement {
     const fanModes = entity?.attributes?.fan_modes || [];
     const currentFanMode = entity?.attributes?.fan_mode || 'auto';
     const allowReorder = this._config.allow_reorder !== false;
-    
+
+    // Determine state label
+    let stateLabel = mode;
+    if (isOn) {
+      if (fanModes.length > 0 && currentFanMode) {
+        stateLabel = `${mode} · ${currentFanMode}`;
+      }
+    } else {
+      stateLabel = 'Off';
+    }
+
     return `
       <div class="item climate-item ${isOn ? 'is-on' : 'is-off'} ${mode === 'cool' ? 'is-cooling' : ''} ${mode === 'heat' ? 'is-heating' : ''}" 
            data-entity="${fav.entity_id}"
            ${allowReorder ? `draggable="true"` : ''}>
-        
-        ${fanModes.length > 0 ? `
-          <div class="fan-mode-wrap ${!isOn ? 'disabled' : ''}">
-            <button class="fan-mode-btn" data-entity="${fav.entity_id}" ${!isOn ? 'disabled' : ''}>
-              <ha-icon icon="${this._getFanIcon(currentFanMode)}"></ha-icon>
-            </button>
-            <div class="fan-dropdown">
-              ${fanModes.map(fm => `
-                <div class="fan-option ${fm === currentFanMode ? 'active' : ''}" data-fan-mode="${fm}" data-entity="${fav.entity_id}">
-                  <ha-icon icon="${this._getFanIcon(fm)}"></ha-icon>
-                  <span>${this._getFanModeLabel(fm)}</span>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        ` : ''}
         
         <div class="climate-header">
           <div class="climate-left">
@@ -1947,9 +2021,28 @@ class FavoritesGridCard extends HTMLElement {
             </div>
             <div class="climate-info">
               <div class="climate-name">${this._getName(fav)}</div>
-              <div class="climate-mode">${mode}${isOn && fanModes.length > 0 ? ` · ${currentFanMode}` : ''}</div>
             </div>
           </div>
+          
+          ${fanModes.length > 0 ? `
+            <div class="fan-mode-wrap ${!isOn ? 'disabled' : ''}">
+              <button class="fan-mode-btn" data-entity="${fav.entity_id}" ${!isOn ? 'disabled' : ''}>
+                <ha-icon icon="${this._getFanIcon(currentFanMode)}"></ha-icon>
+              </button>
+              <div class="fan-dropdown">
+                ${fanModes.map(fm => `
+                  <div class="fan-option ${fm === currentFanMode ? 'active' : ''}" data-fan-mode="${fm}" data-entity="${fav.entity_id}">
+                    <ha-icon icon="${this._getFanIcon(fm)}"></ha-icon>
+                    <span>${this._getFanModeLabel(fm)}</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+        </div>
+        
+        <div class="climate-center-section">
+          <span class="climate-center-state">${stateLabel}</span>
         </div>
         
         ${this._config.show_climate_controls ? `
@@ -1969,7 +2062,7 @@ class FavoritesGridCard extends HTMLElement {
   _renderLightItem(fav, entity) {
     const isOn = entity?.state === 'on';
     const allowReorder = this._config.allow_reorder !== false;
-    
+
     return `
       <div class="item light-item ${isOn ? 'is-on' : ''}" 
            data-entity="${fav.entity_id}"
@@ -1988,64 +2081,78 @@ class FavoritesGridCard extends HTMLElement {
   _renderCoverItem(fav, entity) {
     const state = entity?.state || 'unavailable';
     const position = entity?.attributes?.current_position;
-    const isOpen = state === 'open' || (position !== undefined && position > 0);
-    const isClosed = state === 'closed' || position === 0;
+
+    // Robust state determination
+    const isClosed = state === 'closed';
     const isMoving = state === 'opening' || state === 'closing';
+    const isOpen = !isClosed && !isMoving && state !== 'unavailable';
+
     const allowReorder = this._config.allow_reorder !== false;
     const showControls = this._config.show_cover_controls !== false;
-    
-    let positionText = state;
-    if (position !== undefined) {
-      positionText = `${position}%`;
-    } else if (state === 'open') {
-      positionText = 'Open';
-    } else if (state === 'closed') {
-      positionText = 'Closed';
+
+    // Determine state label
+    let stateLabel = state;
+    if (isClosed) {
+      stateLabel = 'Closed';
+    } else if (isMoving) {
+      stateLabel = state === 'opening' ? 'Opening' : 'Closing';
+    } else if (isOpen) {
+      if (position !== undefined && position !== null && typeof position === 'number') {
+        stateLabel = position === 100 ? 'Open' : position === 0 ? 'Closed' : `${Math.round(position)}%`;
+      } else {
+        stateLabel = 'Open';
+      }
+    } else {
+      stateLabel = state.charAt(0).toUpperCase() + state.slice(1);
     }
-    
+
+    const isFullyOpen = position === 100 || (position === undefined && state === 'open');
+
     return `
       <div class="item cover-item ${isOpen ? 'is-open' : ''} ${isClosed ? 'is-closed' : ''} ${isMoving ? 'is-moving' : ''}" 
            data-entity="${fav.entity_id}"
            ${allowReorder ? `draggable="true"` : ''}>
         
         <div class="cover-header">
-          <div class="cover-icon-wrap">
-            <ha-icon icon="${this._getCoverIcon(state, position)}"></ha-icon>
-          </div>
           <div class="cover-info">
-            <div class="cover-name">${this._getName(fav)}</div>
-            <div class="cover-state">${positionText}</div>
+            <div class="cover-name-row">
+              <div class="cover-icon-wrap">
+                <ha-icon icon="${this._getCoverIcon(state, position)}"></ha-icon>
+              </div>
+              <div class="cover-name">${this._getName(fav)}</div>
+            </div>
           </div>
         </div>
         
+        <div class="cover-center-section">
+          <span class="cover-center-state">${stateLabel}</span>
+        </div>
+        
         ${showControls ? `
-          <div class="cover-controls">
-            <button class="cover-btn up" data-entity="${fav.entity_id}" data-action="open">
-              <ha-icon icon="mdi:arrow-up"></ha-icon>
-            </button>
-            <button class="cover-btn stop" data-entity="${fav.entity_id}" data-action="stop">
-              <ha-icon icon="mdi:stop"></ha-icon>
-            </button>
-            <button class="cover-btn down" data-entity="${fav.entity_id}" data-action="close">
-              <ha-icon icon="mdi:arrow-down"></ha-icon>
-            </button>
-          </div>
-          ${position !== undefined ? `
-            <div class="cover-position">
-              <div class="cover-position-track">
-                <div class="cover-position-fill" style="width: ${position}%"></div>
-              </div>
+          <div class="cover-controls-container">
+            <div class="cover-controls-row">
+              <button class="cover-control-btn close ${isClosed ? 'disabled' : ''}" data-entity="${fav.entity_id}" data-action="close" title="Close">
+                <ha-icon icon="mdi:arrow-collapse-horizontal"></ha-icon>
+              </button>
+              
+              <button class="cover-control-btn pause" data-entity="${fav.entity_id}" data-action="stop" title="Stop">
+                <ha-icon icon="mdi:pause"></ha-icon>
+              </button>
+              
+              <button class="cover-control-btn open ${isFullyOpen ? 'disabled' : ''}" data-entity="${fav.entity_id}" data-action="open" title="Open">
+                <ha-icon icon="mdi:arrow-expand-horizontal"></ha-icon>
+              </button>
             </div>
-          ` : ''}
+          </div>
         ` : ''}
       </div>
     `;
   }
 
   _renderStandardItem(fav, entity) {
-    const isOn = ['on','home','playing','open','unlocked','heat','cool'].includes(entity?.state);
+    const isOn = ['on', 'home', 'playing', 'open', 'unlocked', 'heat', 'cool'].includes(entity?.state);
     const allowReorder = this._config.allow_reorder !== false;
-    
+
     return `
       <div class="item standard-item ${isOn ? 'is-on' : ''}" 
            data-entity="${fav.entity_id}"
@@ -2065,7 +2172,7 @@ class FavoritesGridCard extends HTMLElement {
 
   _attachEventListeners() {
     const allowReorder = this._config.allow_reorder !== false;
-    
+
     // Light items - toggle on click
     this.shadowRoot.querySelectorAll('.light-item').forEach(el => {
       el.addEventListener('click', (e) => {
@@ -2074,7 +2181,7 @@ class FavoritesGridCard extends HTMLElement {
         }
       });
     });
-    
+
     // Standard items - toggle on click
     this.shadowRoot.querySelectorAll('.standard-item').forEach(el => {
       el.addEventListener('click', (e) => {
@@ -2083,49 +2190,49 @@ class FavoritesGridCard extends HTMLElement {
         }
       });
     });
-    
+
     // Climate icon buttons - toggle dropdown
     this.shadowRoot.querySelectorAll('.climate-icon-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         this._toggleClimateDropdown(btn.dataset.entity, e);
       });
     });
-    
+
     // HVAC options
     this.shadowRoot.querySelectorAll('.hvac-option').forEach(opt => {
       opt.addEventListener('click', (e) => {
         this._setHvacMode(opt.dataset.entity, opt.dataset.mode, e);
       });
     });
-    
+
     // Fan mode buttons - toggle dropdown
     this.shadowRoot.querySelectorAll('.fan-mode-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         this._toggleFanDropdown(btn.dataset.entity, e);
       });
     });
-    
+
     // Fan mode options
     this.shadowRoot.querySelectorAll('.fan-option').forEach(opt => {
       opt.addEventListener('click', (e) => {
         this._setFanMode(opt.dataset.entity, opt.dataset.fanMode, e);
       });
     });
-    
+
     // Temperature buttons
     this.shadowRoot.querySelectorAll('.temp-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         this._climateSetTemp(btn.dataset.entity, parseInt(btn.dataset.delta), e);
       });
     });
-    
+
     // Cover buttons
-    this.shadowRoot.querySelectorAll('.cover-btn').forEach(btn => {
+    this.shadowRoot.querySelectorAll('.cover-control-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         this._coverControl(btn.dataset.entity, btn.dataset.action, e);
       });
     });
-    
+
     // Drag and drop
     if (allowReorder) {
       this.shadowRoot.querySelectorAll('.item').forEach(el => {
@@ -2135,7 +2242,7 @@ class FavoritesGridCard extends HTMLElement {
         el.addEventListener('drop', (e) => this._handleDrop(e, el.dataset.entity));
       });
     }
-    
+
     // Long press to rename (for all items)
     this.shadowRoot.querySelectorAll('.item').forEach(el => {
       el.addEventListener('pointerdown', (e) => this._handlePointerDown(e, el));
@@ -2144,7 +2251,7 @@ class FavoritesGridCard extends HTMLElement {
       el.addEventListener('pointercancel', (e) => this._handlePointerUp(e));
       el.addEventListener('pointerleave', (e) => this._handlePointerUp(e));
     });
-    
+
     // Rename popup buttons
     const overlay = this.shadowRoot.querySelector('.rename-overlay');
     if (overlay) {
@@ -2152,22 +2259,22 @@ class FavoritesGridCard extends HTMLElement {
         if (e.target === overlay) this._hideRenamePopup();
       });
     }
-    
+
     const cancelBtn = this.shadowRoot.querySelector('.rename-btn.cancel');
     if (cancelBtn) {
       cancelBtn.addEventListener('click', () => this._hideRenamePopup());
     }
-    
+
     const saveBtn = this.shadowRoot.querySelector('.rename-btn.save');
     if (saveBtn) {
       saveBtn.addEventListener('click', () => this._saveRename());
     }
-    
+
     const resetBtn = this.shadowRoot.querySelector('.rename-btn.reset');
     if (resetBtn) {
       resetBtn.addEventListener('click', () => this._resetRename());
     }
-    
+
     const input = this.shadowRoot.querySelector('.rename-input');
     if (input) {
       input.addEventListener('keydown', (e) => {
@@ -2184,48 +2291,48 @@ class FavoritesGridCard extends HTMLElement {
     if (e.target.closest('button') || e.target.closest('.hvac-dropdown') || e.target.closest('.fan-dropdown')) {
       return;
     }
-    
+
     const entityId = el.dataset.entity;
     if (!entityId) return;
-    
+
     this._longPressStartPos = { x: e.clientX, y: e.clientY };
     this._longPressEntity = entityId;
     this._isLongPressing = false;
-    
+
     this._longPressGlowTimer = setTimeout(() => {
       el.classList.add('long-press-glow');
       if (navigator.vibrate) {
         navigator.vibrate(30);
       }
     }, 1000);
-    
+
     this._longPressTimer = setTimeout(() => {
       this._isLongPressing = true;
       el.classList.remove('long-press-glow');
-      
+
       if (navigator.vibrate) {
         navigator.vibrate([50, 30, 50]);
       }
-      
+
       this._showRenamePopup(entityId);
     }, 4000);
   }
-   
+
   _handlePointerMove(e) {
     if (!this._longPressStartPos) return;
-    
+
     const dx = Math.abs(e.clientX - this._longPressStartPos.x);
     const dy = Math.abs(e.clientY - this._longPressStartPos.y);
-    
+
     if (dx > 10 || dy > 10) {
       this._cancelLongPress();
     }
   }
-   
+
   _handlePointerUp(e) {
     this._cancelLongPress();
   }
-   
+
   _cancelLongPress() {
     if (this._longPressTimer) {
       clearTimeout(this._longPressTimer);
@@ -2235,36 +2342,36 @@ class FavoritesGridCard extends HTMLElement {
       clearTimeout(this._longPressGlowTimer);
       this._longPressGlowTimer = null;
     }
-    
+
     this.shadowRoot.querySelectorAll('.item.long-press-glow').forEach(el => {
       el.classList.remove('long-press-glow');
     });
-    
+
     this._longPressStartPos = null;
     this._longPressEntity = null;
   }
-   
+
   _showRenamePopup(entityId) {
     this._renameEntityId = entityId;
-    
+
     const fav = this._favorites.find(f => f.entity_id === entityId);
     const entity = this._hass?.states[entityId];
     const currentName = fav?.custom_name || entity?.attributes?.friendly_name || entityId.split('.')[1].replace(/_/g, ' ');
-    
+
     const overlay = this.shadowRoot.querySelector('.rename-overlay');
     const input = this.shadowRoot.querySelector('.rename-input');
-    
+
     if (input) {
       input.value = currentName;
       input.placeholder = entity?.attributes?.friendly_name || entityId;
     }
-    
+
     if (overlay) {
       overlay.classList.add('show');
       setTimeout(() => input?.focus(), 200);
     }
   }
-   
+
   _hideRenamePopup() {
     const overlay = this.shadowRoot.querySelector('.rename-overlay');
     if (overlay) {
@@ -2273,21 +2380,21 @@ class FavoritesGridCard extends HTMLElement {
     this._renameEntityId = null;
     this._isLongPressing = false;
   }
-   
+
   async _saveRename() {
     if (!this._renameEntityId || !this._hass || !this._userId) {
       this._hideRenamePopup();
       return;
     }
-    
+
     const input = this.shadowRoot.querySelector('.rename-input');
     const newName = input?.value?.trim();
-    
+
     if (!newName) {
       this._hideRenamePopup();
       return;
     }
-    
+
     const fav = this._favorites.find(f => f.entity_id === this._renameEntityId);
     if (fav) {
       fav.custom_name = newName;
@@ -2295,7 +2402,7 @@ class FavoritesGridCard extends HTMLElement {
       const nameEl = item?.querySelector('.name, .climate-name, .cover-name');
       if (nameEl) nameEl.textContent = newName;
     }
-    
+
     try {
       await this._hass.callService('favorites', 'update', {
         user_id: this._userId,
@@ -2305,27 +2412,27 @@ class FavoritesGridCard extends HTMLElement {
     } catch (error) {
       console.error('[favorites-grid-card] Error renaming:', error);
     }
-    
+
     this._hideRenamePopup();
   }
-   
+
   async _resetRename() {
     if (!this._renameEntityId || !this._hass || !this._userId) {
       this._hideRenamePopup();
       return;
     }
-    
+
     const fav = this._favorites.find(f => f.entity_id === this._renameEntityId);
     const entity = this._hass?.states[this._renameEntityId];
     const defaultName = entity?.attributes?.friendly_name || this._renameEntityId.split('.')[1].replace(/_/g, ' ');
-    
+
     if (fav) {
       fav.custom_name = null;
       const item = this.shadowRoot.querySelector(`[data-entity="${this._renameEntityId}"]`);
       const nameEl = item?.querySelector('.name, .climate-name, .cover-name');
       if (nameEl) nameEl.textContent = defaultName;
     }
-    
+
     try {
       await this._hass.callService('favorites', 'update', {
         user_id: this._userId,
@@ -2335,7 +2442,7 @@ class FavoritesGridCard extends HTMLElement {
     } catch (error) {
       console.error('[favorites-grid-card] Error resetting name:', error);
     }
-    
+
     this._hideRenamePopup();
   }
 
@@ -2350,9 +2457,9 @@ if (!customElements.get('favorites-grid-card')) {
 
 window.customCards = window.customCards || [];
 if (!window.customCards.find(c => c.type === 'favorites-grid-card')) {
-  window.customCards.push({ 
-    type: 'favorites-grid-card', 
-    name: 'Favorites Grid Card', 
+  window.customCards.push({
+    type: 'favorites-grid-card',
+    name: 'Favorites Grid Card',
     description: 'Displays favorites with theme support, climate controls, light styling, and drag-drop reorder',
     preview: true,
     documentationURL: 'https://github.com/your-repo/favorites-grid-card',

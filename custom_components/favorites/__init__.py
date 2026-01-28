@@ -235,7 +235,7 @@ async def async_register_resources(hass: HomeAssistant) -> None:
         integration = await async_get_integration(hass, DOMAIN)
         integration_path = integration.file_path
         
-        www_path = os.path.join(os.path.dirname(integration_path), "www")
+        www_path = os.path.join(integration_path, "www")
         
         if not os.path.isdir(www_path):
             _LOGGER.warning("www directory not found, skipping resource registration")
