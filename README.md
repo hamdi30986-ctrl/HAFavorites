@@ -4,7 +4,6 @@
 
 A Home Assistant custom integration that adds a **favorites system** to your dashboards, allowing you to quickly access important entities without duplicating cards manually.
 
-![Favorites Grid](https://github.com/user-attachments/assets/1fa46d5d-1d0f-49cf-8fb8-a50eeee7f726)
 ![Favoritable Card](https://github.com/user-attachments/assets/84e2e64e-95f1-4e02-8f57-6565d4ecf509)
 
 ## ✨ Features
