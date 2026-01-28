@@ -1,12 +1,14 @@
 {
   "domain": "favorites",
   "name": "HAFavorites",
-  "codeowners": ["@hamdi30986-ctrl"],
+  "codeowners": [
+    "@hamdi30986-ctrl"
+  ],
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/hamdi30986-ctrl/hafavorites",
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/hamdi30986-ctrl/hafavorites/issues",
   "requirements": [],
-  "version": "1.0.0"
+  "version": "3.0.0"
 }
