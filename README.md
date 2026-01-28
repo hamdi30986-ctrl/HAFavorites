@@ -10,23 +10,23 @@ A Home Assistant custom integration that adds a **favorites system** to your das
 
 ## ✨ Features
 
-- ⭐ **Visual Star Button** - Add favorites with a click
-- 🎯 **Native Hold-Action** - Use hold-action to add favorites (no wrapper needed)
-- 📊 **Favorites Grid Card** - Beautiful grid display with multiple themes
-- 👤 **Per-User Support** - Each user has their own favorites list
-- 🎨 **Multiple Themes** - Dark, Light, Liquid Glass, and Native themes
-- 🔄 **Real-time Updates** - Changes sync instantly
-- 🎛️ **Entity Controls** - Built-in controls for lights, climate, covers
-- 📝 **Custom Names** - Rename favorites with long-press
-- 🔀 **Drag & Drop** - Reorder favorites easily
+- **Visual Star Button** - Add favorites with a click
+- **Native Hold-Action** - Use hold-action to add favorites (no wrapper needed)
+- **Favorites Grid Card** - Beautiful grid display with multiple themes
+- **Per-User Support** - Each user has their own favorites list
+- **Multiple Themes** - Dark, Light, Liquid Glass, and Native themes
+- **Real-time Updates** - Changes sync instantly
+- **Entity Controls** - Built-in controls for lights, climate, covers
+- **Custom Names** - Rename favorites with long-press
+- **Drag & Drop** - Reorder favorites easily
 
-## 🚀 Installation
+## Installation
 
 ### HACS (Recommended)
 
 1. Open HACS → **Integrations**
 2. Click **⋮** → **Custom repositories**
-3. Add repository: `https://github.com/hamdi30986-ctrl/hafavorites`
+3. Add repository: `https://github.com/hamdi30986-ctrl/HAFavorites`
 4. Category: **Integration**
 5. Install **HAFavorites**
 6. Restart Home Assistant
@@ -40,7 +40,7 @@ A Home Assistant custom integration that adds a **favorites system** to your das
 3. Restart Home Assistant
 4. Add the integration via **Settings → Devices & Services**
 
-## 📦 Custom Cards
+## Custom Cards
 
 The custom cards are **automatically installed and registered** when you set up the integration!
 
@@ -50,7 +50,7 @@ The custom cards are **automatically installed and registered** when you set up 
 
 If cards don't appear after installation, refresh your browser or restart Home Assistant.
 
-## 🎯 Adding Entities to Favorites
+## Adding Entities to Favorites
 
 ### Method 1: Favoritable Card (Visual Star) ⭐
 
@@ -66,7 +66,7 @@ card:
     - light.living_room
 ```
 
-### Method 2: Hold-Action (Native HA) 🎯
+### Method 2: Hold-Action (Native HA) 
 
 Use Home Assistant's built-in hold-action:
 
@@ -82,7 +82,7 @@ entities:
         user_id: "{{ user.id }}"
 ```
 
-## 📊 Favorites Grid Card
+## Favorites Grid Card
 
 Add the grid card to display all favorites:
 
@@ -107,13 +107,13 @@ allow_reorder: true
 | `show_cover_controls` | `true` | Show cover controls |
 | `allow_reorder` | `true` | Enable drag-and-drop |
 
-## 🎮 Usage
+## Usage
 
 - **Rename**: Long-press any favorite (4 seconds) to rename
 - **Reorder**: Drag and drop items in the grid
 - **Per-User**: Each user has their own favorites list
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 **Star button not appearing?**
 - Refresh your browser (cards are auto-registered)
@@ -129,7 +129,7 @@ allow_reorder: true
 - Verify the card supports `hold_action`
 - Check browser console for errors
 
-## 📞 Support
+## Support
 
 - **Issues**: [GitHub Issues](https://github.com/hamdi30986-ctrl/hafavorites/issues)
 
