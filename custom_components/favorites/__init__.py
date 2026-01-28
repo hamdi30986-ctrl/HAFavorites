@@ -23,12 +23,12 @@ import os
 _LOGGER = logging.getLogger(__name__)
 
 DOMAIN = "favorites"
-STORAGE_VERSION = 1  # Keep at 1, handle migration internally
+STORAGE_VERSION = 1
 STORAGE_KEY = DOMAIN
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
-# Service constants
+
 SERVICE_ADD = "add"
 SERVICE_REMOVE = "remove"
 SERVICE_TOGGLE = "toggle"
@@ -58,12 +58,10 @@ class FavoritesStore:
         """Load data from storage."""
         data = await self._store.async_load()
         if data:
-            # Migration: convert old format to new format
+        if data:
             if "items" in data and "users" not in data:
                 _LOGGER.info("Migrating favorites to per-user format")
-                # Store old items under a default key - user can re-favorite them
                 self._data = {"users": {"migrated_default": data["items"]}}
-                # Save migrated data
                 await self.async_save()
             elif "users" in data:
                 self._data = data
@@ -111,18 +109,17 @@ class FavoritesStore:
         if self.is_favorite(user_id, entity_id):
             return False
 
-        # Ensure user exists in data
+
         if user_id not in self._data["users"]:
             self._data["users"][user_id] = []
 
-        # Get area from entity registry if available
         area_id = None
         try:
             entity_registry = er.async_get(self.hass)
             if entry := entity_registry.async_get(entity_id):
                 area_id = entry.area_id
         except Exception:
-            pass  # Area ID is optional, continue without it
+            pass
 
         user_items = self.get_user_items(user_id)
         new_item = {
@@ -134,7 +131,6 @@ class FavoritesStore:
             "area_id": area_id,
         }
 
-        # Create NEW dict objects to ensure Home Assistant detects the change
         new_user_items = [*user_items, new_item]
         self._data["users"] = {**self._data.get("users", {}), user_id: new_user_items}
         await self.async_save()
@@ -152,7 +148,6 @@ class FavoritesStore:
         if len(new_items) < original_length:
             for i, item in enumerate(new_items):
                 item["order"] = i
-            # Create NEW dict to ensure HA detects the change
             self._data["users"] = {**self._data.get("users", {}), user_id: new_items}
             await self.async_save()
             return True
@@ -187,13 +182,11 @@ class FavoritesStore:
                 item["order"] = len(new_items)
                 new_items.append(item)
 
-        # Create NEW dict to ensure HA detects the change
         self._data["users"] = {**self._data.get("users", {}), user_id: new_items}
         await self.async_save()
 
     async def async_clear(self, user_id: str) -> None:
         """Clear all favorites for a specific user."""
-        # Create NEW dict to ensure HA detects the change
         self._data["users"] = {**self._data.get("users", {}), user_id: []}
         await self.async_save()
 
@@ -212,12 +205,11 @@ class FavoritesStore:
         
         for item in user_items:
             if item["entity_id"] == entity_id:
-                item["custom_name"] = custom_name  # None resets to default
+                item["custom_name"] = custom_name
                 updated = True
                 break
         
         if updated:
-            # Create NEW dict to ensure HA detects the change
             self._data["users"] = {**self._data.get("users", {}), user_id: user_items}
             await self.async_save()
         
@@ -375,7 +367,7 @@ async def async_register_services(hass: HomeAssistant, store: FavoritesStore) ->
     async def handle_update(call: ServiceCall) -> None:
         user_id = call.data[ATTR_USER_ID]
         entity_id = call.data[ATTR_ENTITY_ID]
-        custom_name = call.data.get(ATTR_CUSTOM_NAME)  # None means reset to default
+        custom_name = call.data.get(ATTR_CUSTOM_NAME)
         if await store.async_update(user_id, entity_id, custom_name):
             _LOGGER.info("Updated %s for user %s - name: %s", entity_id, user_id, custom_name or "(default)")
             fire_changed_event("update", user_id, entity_id)
