@@ -6,6 +6,8 @@ A Home Assistant custom integration that adds a **favorites system** to your das
 
 ![Favoritable Card](https://github.com/user-attachments/assets/84e2e64e-95f1-4e02-8f57-6565d4ecf509)
 
+<img width="517" height="784" alt="image" src="https://github.com/user-attachments/assets/ed3cfd3b-1a71-4c99-8d04-5537f2de51f3" />
+
 ## ✨ Features
 
 - ⭐ **Visual Star Button** - Add favorites with a click
