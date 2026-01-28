@@ -39,15 +39,15 @@ A Home Assistant custom integration that adds a **favorites system** to your das
 3. Restart Home Assistant
 4. Add the integration via **Settings → Devices & Services**
 
-## 📦 Installing the Custom Cards
+## 📦 Custom Cards
 
-1. Copy `favoritable-card.js` and `favorites-grid-card.js` from `cards/` to `/config/www/`
-2. Go to **Settings → Dashboards → Resources** (⋮ menu)
-3. Click **Add Resource**
-4. For each card:
-   - **URL**: `/local/favoritable-card.js` (or `favorites-grid-card.js`)
-   - **Resource Type**: JavaScript Module
-5. Click **Create** and refresh your browser
+The custom cards are **automatically installed and registered** when you set up the integration!
+
+- Cards are automatically downloaded with the integration
+- Resources are automatically added to Lovelace
+- No manual setup required
+
+If cards don't appear after installation, refresh your browser or restart Home Assistant.
 
 ## 🎯 Adding Entities to Favorites
 
@@ -115,12 +115,14 @@ allow_reorder: true
 ## 🐛 Troubleshooting
 
 **Star button not appearing?**
-- Make sure `favoritable-card.js` is added as a resource
-- Refresh your browser
+- Refresh your browser (cards are auto-registered)
+- Check that the integration is configured
+- Verify resources in **Settings → Dashboards → Resources**
 
 **Favorites not showing?**
-- Verify `favorites-grid-card.js` is added as a resource
+- Refresh your browser
 - Check that the integration is configured
+- Verify `sensor.favorites_list` exists in Developer Tools
 
 **Hold-action not working?**
 - Verify the card supports `hold_action`

@@ -17,6 +17,8 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.loader import async_get_integration
+import os
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -227,6 +229,72 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
+async def async_register_resources(hass: HomeAssistant) -> None:
+    """Automatically register Lovelace resources for the cards."""
+    try:
+        integration = await async_get_integration(hass, DOMAIN)
+        integration_path = integration.file_path
+        
+        www_path = os.path.join(os.path.dirname(integration_path), "www")
+        
+        if not os.path.isdir(www_path):
+            _LOGGER.warning("www directory not found, skipping resource registration")
+            return
+        
+        try:
+            from homeassistant.components.lovelace import RESOURCE_SCHEMA
+            from homeassistant.components.lovelace.resources import ResourceStorageCollection
+            
+            if "lovelace" not in hass.data:
+                _LOGGER.debug("Lovelace not loaded yet, resources will be registered on next restart")
+                return
+            
+            resources: ResourceStorageCollection = hass.data["lovelace"]["resources"]
+            if not resources:
+                _LOGGER.warning("Lovelace resources collection not available")
+                return
+            
+            card_files = [
+                ("favoritable-card.js", "favoritable-card"),
+                ("favorites-grid-card.js", "favorites-grid-card"),
+            ]
+            
+            for filename, card_type in card_files:
+                file_path = os.path.join(www_path, filename)
+                if not os.path.isfile(file_path):
+                    _LOGGER.warning("Card file not found: %s", filename)
+                    continue
+                
+                try:
+                    if "hacs" in hass.config.components:
+                        url = f"/hacsfiles/{DOMAIN}/{filename}"
+                    else:
+                        url = f"/local/{filename}"
+                    
+                    existing_resources = await resources.async_items()
+                    resource_exists = any(
+                        res.get("url") == url and res.get("type") == "module"
+                        for res in existing_resources
+                    )
+                    
+                    if not resource_exists:
+                        await resources.async_create_item({
+                            "type": "module",
+                            "url": url,
+                        })
+                        _LOGGER.info("Automatically registered resource: %s", url)
+                    else:
+                        _LOGGER.debug("Resource already exists: %s", url)
+                except Exception as err:
+                    _LOGGER.error("Failed to register resource %s: %s", filename, err)
+        except ImportError:
+            _LOGGER.warning("Lovelace resources not available, skipping automatic registration")
+        except Exception as err:
+            _LOGGER.error("Error registering resources: %s", err)
+    except Exception as err:
+        _LOGGER.error("Failed to register resources: %s", err)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Favorites from a config entry."""
     store = FavoritesStore(hass)
@@ -238,6 +306,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await async_register_services(hass, store)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    
+    await async_register_resources(hass)
 
     return True
 
