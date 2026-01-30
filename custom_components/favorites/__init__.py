@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from typing import Any
+import os  # Moved to top
 
 import voluptuous as vol
 
@@ -18,7 +19,6 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.loader import async_get_integration
-import os
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,6 +28,9 @@ STORAGE_KEY = DOMAIN
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
+# --- ADDED: CONSTANTS FOR ASSET SERVING ---
+ASSET_URL_PATH = f"/{DOMAIN}_static"
+# ------------------------------------------
 
 SERVICE_ADD = "add"
 SERVICE_REMOVE = "remove"
@@ -57,7 +60,6 @@ class FavoritesStore:
     async def async_load(self) -> None:
         """Load data from storage."""
         data = await self._store.async_load()
-        if data:
         if data:
             if "items" in data and "users" not in data:
                 _LOGGER.info("Migrating favorites to per-user format")
@@ -108,7 +110,6 @@ class FavoritesStore:
         """Add an entity to favorites for a specific user."""
         if self.is_favorite(user_id, entity_id):
             return False
-
 
         if user_id not in self._data["users"]:
             self._data["users"][user_id] = []
@@ -165,7 +166,7 @@ class FavoritesStore:
     async def async_reorder(self, user_id: str, entity_ids: list[str]) -> None:
         """Reorder favorites based on provided entity_id list for a specific user."""
         if user_id not in self._data["users"]:
-            return
+            return # FIXED: removed typo 'return return'
 
         user_items = self.get_user_items(user_id)
         item_map = {item["entity_id"]: item for item in user_items}
@@ -222,26 +223,31 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 async def async_register_resources(hass: HomeAssistant) -> None:
-    """Automatically register Lovelace resources for the cards."""
+    """Automatically register Lovelace resources using static path."""
     try:
+        # 1. Find the path to the integration's www folder
         integration = await async_get_integration(hass, DOMAIN)
         integration_path = integration.file_path
-        
         www_path = os.path.join(integration_path, "www")
         
         if not os.path.isdir(www_path):
             _LOGGER.warning("www directory not found, skipping resource registration")
             return
         
+        # 2. Register the static path so HA serves these files
+        hass.http.register_static_path(
+            ASSET_URL_PATH,
+            www_path,
+            cache_headers=True
+        )
+        
+        # 3. Register the resources in Lovelace
         try:
-            from homeassistant.components.lovelace import RESOURCE_SCHEMA
-            from homeassistant.components.lovelace.resources import ResourceStorageCollection
-            
             if "lovelace" not in hass.data:
                 _LOGGER.debug("Lovelace not loaded yet, resources will be registered on next restart")
                 return
             
-            resources: ResourceStorageCollection = hass.data["lovelace"]["resources"]
+            resources = hass.data["lovelace"]["resources"]
             if not resources:
                 _LOGGER.warning("Lovelace resources collection not available")
                 return
@@ -257,32 +263,29 @@ async def async_register_resources(hass: HomeAssistant) -> None:
                     _LOGGER.warning("Card file not found: %s", filename)
                     continue
                 
-                try:
-                    if "hacs" in hass.config.components:
-                        url = f"/hacsfiles/{DOMAIN}/{filename}"
-                    else:
-                        url = f"/local/{filename}"
+                # UPDATED: Use static URL
+                url = f"{ASSET_URL_PATH}/{filename}"
+                
+                existing_resources = await resources.async_items()
+                resource_exists = any(
+                    res.get("url") == url and res.get("type") == "module"
+                    for res in existing_resources
+                )
+                
+                if not resource_exists:
+                    await resources.async_create_item({
+                        "type": "module",
+                        "url": url,
+                    })
+                    _LOGGER.info("Automatically registered resource: %s", url)
+                else:
+                    _LOGGER.debug("Resource already exists: %s", url)
                     
-                    existing_resources = await resources.async_items()
-                    resource_exists = any(
-                        res.get("url") == url and res.get("type") == "module"
-                        for res in existing_resources
-                    )
-                    
-                    if not resource_exists:
-                        await resources.async_create_item({
-                            "type": "module",
-                            "url": url,
-                        })
-                        _LOGGER.info("Automatically registered resource: %s", url)
-                    else:
-                        _LOGGER.debug("Resource already exists: %s", url)
-                except Exception as err:
-                    _LOGGER.error("Failed to register resource %s: %s", filename, err)
         except ImportError:
             _LOGGER.warning("Lovelace resources not available, skipping automatic registration")
         except Exception as err:
             _LOGGER.error("Error registering resources: %s", err)
+            
     except Exception as err:
         _LOGGER.error("Failed to register resources: %s", err)
 
@@ -299,6 +302,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await async_register_services(hass, store)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     
+    # Run resource registration
     await async_register_resources(hass)
 
     return True
