@@ -121,3 +121,63 @@ update:
       example: "Living Room Light"
       selector:
         text:
+
+restore:
+  name: Restore from Recently Removed
+  description: Restore a recently removed entity back to favorites.
+  fields:
+    user_id:
+      name: User ID
+      description: The user ID to restore the favorite for.
+      required: true
+      example: "d7ae8fe13f584ba08bf0c41f0bdbe576"
+      selector:
+        text:
+    entity_id:
+      name: Entity
+      description: The entity to restore from recently removed.
+      required: true
+      selector:
+        entity:
+
+set_entity_theme:
+  name: Set Entity Theme
+  description: Set a per-entity theme preference.
+  fields:
+    user_id:
+      name: User ID
+      description: The user ID to set the theme for.
+      required: true
+      example: "d7ae8fe13f584ba08bf0c41f0bdbe576"
+      selector:
+        text:
+    entity_id:
+      name: Entity
+      description: The entity to set the theme for.
+      required: true
+      selector:
+        entity:
+    theme:
+      name: Theme
+      description: Theme to apply (dark, light, liquid, native, or null to reset).
+      required: false
+      example: "dark"
+      selector:
+        select:
+          options:
+            - "dark"
+            - "light"
+            - "liquid"
+            - "native"
+
+clear_recently_removed:
+  name: Clear Recently Removed
+  description: Clear the recently removed list for a user.
+  fields:
+    user_id:
+      name: User ID
+      description: The user ID to clear recently removed for.
+      required: true
+      example: "d7ae8fe13f584ba08bf0c41f0bdbe576"
+      selector:
+        text:

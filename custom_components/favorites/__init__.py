@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from typing import Any
+import os  # Moved to top
 
 import voluptuous as vol
 
@@ -18,7 +19,6 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.loader import async_get_integration
-import os
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,6 +28,9 @@ STORAGE_KEY = DOMAIN
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
+# --- ADDED: CONSTANTS FOR ASSET SERVING ---
+ASSET_URL_PATH = f"/{DOMAIN}_static"
+# ------------------------------------------
 
 SERVICE_ADD = "add"
 SERVICE_REMOVE = "remove"
@@ -35,40 +38,49 @@ SERVICE_TOGGLE = "toggle"
 SERVICE_REORDER = "reorder"
 SERVICE_CLEAR = "clear"
 SERVICE_UPDATE = "update"
+SERVICE_RESTORE = "restore"
+SERVICE_SET_ENTITY_THEME = "set_entity_theme"
+SERVICE_CLEAR_RECENTLY_REMOVED = "clear_recently_removed"
 
 ATTR_ENTITY_ID = "entity_id"
 ATTR_USER_ID = "user_id"
 ATTR_CUSTOM_NAME = "custom_name"
 ATTR_CUSTOM_ICON = "custom_icon"
 ATTR_ENTITY_IDS = "entity_ids"
+ATTR_THEME = "theme"
 
 EVENT_FAVORITES_CHANGED = "favorites_changed"
+EVENT_RECENTLY_REMOVED_CHANGED = "favorites_recently_removed_changed"
 
 
 class FavoritesStore:
     """Manage favorites storage with per-user support."""
 
+    MAX_RECENTLY_REMOVED = 20
+
     def __init__(self, hass: HomeAssistant) -> None:
         """Initialize the store."""
         self.hass = hass
         self._store: Store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
-        self._data: dict[str, Any] = {"users": {}}
+        self._data: dict[str, Any] = {"users": {}, "recently_removed": {}}
 
     async def async_load(self) -> None:
         """Load data from storage."""
         data = await self._store.async_load()
         if data:
-        if data:
             if "items" in data and "users" not in data:
                 _LOGGER.info("Migrating favorites to per-user format")
-                self._data = {"users": {"migrated_default": data["items"]}}
+                self._data = {"users": {"migrated_default": data["items"]}, "recently_removed": {}}
                 await self.async_save()
             elif "users" in data:
                 self._data = data
+                # Ensure recently_removed exists
+                if "recently_removed" not in self._data:
+                    self._data["recently_removed"] = {}
             else:
-                self._data = {"users": {}}
+                self._data = {"users": {}, "recently_removed": {}}
         else:
-            self._data = {"users": {}}
+            self._data = {"users": {}, "recently_removed": {}}
 
     async def async_save(self) -> None:
         """Save data from storage."""
@@ -79,6 +91,11 @@ class FavoritesStore:
         """Return the full users dict (copy to avoid reference issues)."""
         return dict(self._data.get("users", {}))
 
+    @property
+    def recently_removed(self) -> dict[str, list[dict[str, Any]]]:
+        """Return the recently removed dict (copy to avoid reference issues)."""
+        return dict(self._data.get("recently_removed", {}))
+
     def get_user_items(self, user_id: str) -> list[dict[str, Any]]:
         """Return the list of favorite items for a specific user."""
         return self._data.get("users", {}).get(user_id, [])
@@ -86,6 +103,10 @@ class FavoritesStore:
     def get_user_entity_ids(self, user_id: str) -> list[str]:
         """Return list of favorited entity IDs for a specific user."""
         return [item["entity_id"] for item in self.get_user_items(user_id)]
+
+    def get_recently_removed_items(self, user_id: str) -> list[dict[str, Any]]:
+        """Return list of recently removed items for a specific user."""
+        return self._data.get("recently_removed", {}).get(user_id, [])
 
     def is_favorite(self, user_id: str, entity_id: str) -> bool:
         """Check if an entity is favorited by a specific user."""
@@ -108,7 +129,6 @@ class FavoritesStore:
         """Add an entity to favorites for a specific user."""
         if self.is_favorite(user_id, entity_id):
             return False
-
 
         if user_id not in self._data["users"]:
             self._data["users"][user_id] = []
@@ -137,18 +157,40 @@ class FavoritesStore:
         return True
 
     async def async_remove(self, user_id: str, entity_id: str) -> bool:
-        """Remove an entity from favorites for a specific user."""
+        """Remove an entity from favorites for a specific user and archive it."""
         if user_id not in self._data["users"]:
             return False
 
         user_items = self.get_user_items(user_id)
-        original_length = len(user_items)
-        new_items = [item for item in user_items if item["entity_id"] != entity_id]
+        removed_item = None
+        new_items = []
+        
+        for item in user_items:
+            if item["entity_id"] == entity_id:
+                removed_item = item.copy()
+            else:
+                new_items.append(item)
 
-        if len(new_items) < original_length:
+        if removed_item:
+            # Re-order remaining items
             for i, item in enumerate(new_items):
                 item["order"] = i
             self._data["users"] = {**self._data.get("users", {}), user_id: new_items}
+            
+            # Archive to recently_removed (max 20 items)
+            removed_item["removed_at"] = datetime.now().isoformat()
+            if "recently_removed" not in self._data:
+                self._data["recently_removed"] = {}
+            if user_id not in self._data["recently_removed"]:
+                self._data["recently_removed"][user_id] = []
+            
+            # Add to front of list
+            self._data["recently_removed"][user_id].insert(0, removed_item)
+            
+            # Trim to max items
+            if len(self._data["recently_removed"][user_id]) > self.MAX_RECENTLY_REMOVED:
+                self._data["recently_removed"][user_id] = self._data["recently_removed"][user_id][:self.MAX_RECENTLY_REMOVED]
+            
             await self.async_save()
             return True
         return False
@@ -165,7 +207,7 @@ class FavoritesStore:
     async def async_reorder(self, user_id: str, entity_ids: list[str]) -> None:
         """Reorder favorites based on provided entity_id list for a specific user."""
         if user_id not in self._data["users"]:
-            return
+            return # FIXED: removed typo 'return return'
 
         user_items = self.get_user_items(user_id)
         item_map = {item["entity_id"]: item for item in user_items}
@@ -215,6 +257,70 @@ class FavoritesStore:
         
         return updated
 
+    async def async_restore(self, user_id: str, entity_id: str) -> bool:
+        """Restore a recently removed entity back to favorites."""
+        if user_id not in self._data.get("recently_removed", {}):
+            return False
+        
+        recently_removed = self._data["recently_removed"][user_id]
+        restored_item = None
+        new_recently_removed = []
+        
+        for item in recently_removed:
+            if item["entity_id"] == entity_id and restored_item is None:
+                restored_item = item.copy()
+                # Remove removed_at since it's being restored
+                restored_item.pop("removed_at", None)
+            else:
+                new_recently_removed.append(item)
+        
+        if restored_item:
+            # Add back to favorites
+            if user_id not in self._data["users"]:
+                self._data["users"][user_id] = []
+            
+            user_items = self.get_user_items(user_id)
+            restored_item["order"] = len(user_items)
+            restored_item["added_at"] = datetime.now().isoformat()
+            
+            self._data["users"][user_id] = [*user_items, restored_item]
+            self._data["recently_removed"][user_id] = new_recently_removed
+            
+            await self.async_save()
+            return True
+        return False
+
+    async def async_set_entity_theme(
+        self,
+        user_id: str,
+        entity_id: str,
+        theme: str | None = None,
+    ) -> bool:
+        """Set a per-entity theme preference."""
+        if user_id not in self._data["users"]:
+            return False
+
+        user_items = self.get_user_items(user_id)
+        updated = False
+        
+        for item in user_items:
+            if item["entity_id"] == entity_id:
+                item["theme"] = theme
+                updated = True
+                break
+        
+        if updated:
+            self._data["users"] = {**self._data.get("users", {}), user_id: user_items}
+            await self.async_save()
+        
+        return updated
+
+    async def async_clear_recently_removed(self, user_id: str) -> None:
+        """Clear recently removed list for a specific user."""
+        if "recently_removed" in self._data and user_id in self._data["recently_removed"]:
+            self._data["recently_removed"][user_id] = []
+            await self.async_save()
+
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up from YAML (not used)."""
@@ -222,26 +328,31 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 async def async_register_resources(hass: HomeAssistant) -> None:
-    """Automatically register Lovelace resources for the cards."""
+    """Automatically register Lovelace resources using static path."""
     try:
+        # 1. Find the path to the integration's www folder
         integration = await async_get_integration(hass, DOMAIN)
         integration_path = integration.file_path
-        
         www_path = os.path.join(integration_path, "www")
         
         if not os.path.isdir(www_path):
             _LOGGER.warning("www directory not found, skipping resource registration")
             return
         
+        # 2. Register the static path so HA serves these files
+        hass.http.register_static_path(
+            ASSET_URL_PATH,
+            www_path,
+            cache_headers=True
+        )
+        
+        # 3. Register the resources in Lovelace
         try:
-            from homeassistant.components.lovelace import RESOURCE_SCHEMA
-            from homeassistant.components.lovelace.resources import ResourceStorageCollection
-            
             if "lovelace" not in hass.data:
                 _LOGGER.debug("Lovelace not loaded yet, resources will be registered on next restart")
                 return
             
-            resources: ResourceStorageCollection = hass.data["lovelace"]["resources"]
+            resources = hass.data["lovelace"]["resources"]
             if not resources:
                 _LOGGER.warning("Lovelace resources collection not available")
                 return
@@ -257,32 +368,29 @@ async def async_register_resources(hass: HomeAssistant) -> None:
                     _LOGGER.warning("Card file not found: %s", filename)
                     continue
                 
-                try:
-                    if "hacs" in hass.config.components:
-                        url = f"/hacsfiles/{DOMAIN}/{filename}"
-                    else:
-                        url = f"/local/{filename}"
+                # UPDATED: Use static URL
+                url = f"{ASSET_URL_PATH}/{filename}"
+                
+                existing_resources = await resources.async_items()
+                resource_exists = any(
+                    res.get("url") == url and res.get("type") == "module"
+                    for res in existing_resources
+                )
+                
+                if not resource_exists:
+                    await resources.async_create_item({
+                        "type": "module",
+                        "url": url,
+                    })
+                    _LOGGER.info("Automatically registered resource: %s", url)
+                else:
+                    _LOGGER.debug("Resource already exists: %s", url)
                     
-                    existing_resources = await resources.async_items()
-                    resource_exists = any(
-                        res.get("url") == url and res.get("type") == "module"
-                        for res in existing_resources
-                    )
-                    
-                    if not resource_exists:
-                        await resources.async_create_item({
-                            "type": "module",
-                            "url": url,
-                        })
-                        _LOGGER.info("Automatically registered resource: %s", url)
-                    else:
-                        _LOGGER.debug("Resource already exists: %s", url)
-                except Exception as err:
-                    _LOGGER.error("Failed to register resource %s: %s", filename, err)
         except ImportError:
             _LOGGER.warning("Lovelace resources not available, skipping automatic registration")
         except Exception as err:
             _LOGGER.error("Error registering resources: %s", err)
+            
     except Exception as err:
         _LOGGER.error("Failed to register resources: %s", err)
 
@@ -299,6 +407,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await async_register_services(hass, store)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     
+    # Run resource registration
     await async_register_resources(hass)
 
     return True
@@ -372,6 +481,35 @@ async def async_register_services(hass: HomeAssistant, store: FavoritesStore) ->
             _LOGGER.info("Updated %s for user %s - name: %s", entity_id, user_id, custom_name or "(default)")
             fire_changed_event("update", user_id, entity_id)
 
+    async def handle_restore(call: ServiceCall) -> None:
+        user_id = call.data[ATTR_USER_ID]
+        entity_id = call.data[ATTR_ENTITY_ID]
+        if await store.async_restore(user_id, entity_id):
+            _LOGGER.info("Restored %s to favorites for user %s", entity_id, user_id)
+            fire_changed_event("restore", user_id, entity_id)
+            # Also fire recently removed changed event
+            hass.bus.async_fire(
+                EVENT_RECENTLY_REMOVED_CHANGED,
+                {"action": "restore", "user_id": user_id, "entity_id": entity_id},
+            )
+
+    async def handle_set_entity_theme(call: ServiceCall) -> None:
+        user_id = call.data[ATTR_USER_ID]
+        entity_id = call.data[ATTR_ENTITY_ID]
+        theme = call.data.get(ATTR_THEME)
+        if await store.async_set_entity_theme(user_id, entity_id, theme):
+            _LOGGER.info("Set theme for %s to %s for user %s", entity_id, theme or "(default)", user_id)
+            fire_changed_event("theme_update", user_id, entity_id)
+
+    async def handle_clear_recently_removed(call: ServiceCall) -> None:
+        user_id = call.data[ATTR_USER_ID]
+        await store.async_clear_recently_removed(user_id)
+        _LOGGER.info("Cleared recently removed for user %s", user_id)
+        hass.bus.async_fire(
+            EVENT_RECENTLY_REMOVED_CHANGED,
+            {"action": "clear", "user_id": user_id},
+        )
+
     hass.services.async_register(
         DOMAIN, SERVICE_ADD, handle_add,
         schema=vol.Schema({
@@ -419,5 +557,29 @@ async def async_register_services(hass: HomeAssistant, store: FavoritesStore) ->
             vol.Required(ATTR_USER_ID): cv.string,
             vol.Required(ATTR_ENTITY_ID): cv.entity_id,
             vol.Optional(ATTR_CUSTOM_NAME): vol.Any(cv.string, None),
+        }),
+    )
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_RESTORE, handle_restore,
+        schema=vol.Schema({
+            vol.Required(ATTR_USER_ID): cv.string,
+            vol.Required(ATTR_ENTITY_ID): cv.entity_id,
+        }),
+    )
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_SET_ENTITY_THEME, handle_set_entity_theme,
+        schema=vol.Schema({
+            vol.Required(ATTR_USER_ID): cv.string,
+            vol.Required(ATTR_ENTITY_ID): cv.entity_id,
+            vol.Optional(ATTR_THEME): vol.Any(cv.string, None),
+        }),
+    )
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_CLEAR_RECENTLY_REMOVED, handle_clear_recently_removed,
+        schema=vol.Schema({
+            vol.Required(ATTR_USER_ID): cv.string,
         }),
     )

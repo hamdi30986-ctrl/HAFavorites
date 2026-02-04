@@ -207,12 +207,12 @@ class FavoritesGridCardEditor extends HTMLElement {
       
       <div class="editor-row checkbox-row">
         <input type="checkbox" id="show_climate_controls" ${this._config.show_climate_controls !== false ? 'checked' : ''}>
-        <label for="show_climate_controls">Show climate controls</label>
+        <label for="show_climate_controls">Show climate controls (full size)</label>
       </div>
       
       <div class="editor-row checkbox-row">
         <input type="checkbox" id="show_cover_controls" ${this._config.show_cover_controls !== false ? 'checked' : ''}>
-        <label for="show_cover_controls">Show cover controls</label>
+        <label for="show_cover_controls">Show cover controls (full size)</label>
       </div>
       
       <div class="editor-row checkbox-row">
@@ -221,8 +221,54 @@ class FavoritesGridCardEditor extends HTMLElement {
       </div>
       
       <div class="editor-row checkbox-row">
+        <input type="checkbox" id="climate_compact" ${this._config.climate_compact ? 'checked' : ''}>
+        <label for="climate_compact">Compact climate cards (tap for popup)</label>
+      </div>
+      
+      <div class="editor-row checkbox-row">
+        <input type="checkbox" id="cover_compact" ${this._config.cover_compact ? 'checked' : ''}>
+        <label for="cover_compact">Compact cover cards (tap for popup)</label>
+      </div>
+      
+      <div class="editor-row checkbox-row">
         <input type="checkbox" id="allow_reorder" ${this._config.allow_reorder !== false ? 'checked' : ''}>
         <label for="allow_reorder">Allow drag-drop reorder</label>
+      </div>
+      
+      <div class="section-title">Per-Category Themes</div>
+      <p style="font-size: 11px; color: var(--secondary-text-color); margin: 0 0 12px 0;">Override global theme for specific entity types</p>
+      
+      <div class="editor-row">
+        <label>Lights Theme</label>
+        <select id="theme_lights">
+          <option value="" ${!this._config.theme_lights ? 'selected' : ''}>Use global</option>
+          <option value="dark" ${this._config.theme_lights === 'dark' ? 'selected' : ''}>Dark Glass</option>
+          <option value="light" ${this._config.theme_lights === 'light' ? 'selected' : ''}>Light Glass</option>
+          <option value="liquid" ${this._config.theme_lights === 'liquid' ? 'selected' : ''}>Liquid Glass</option>
+          <option value="native" ${this._config.theme_lights === 'native' ? 'selected' : ''}>Native HA</option>
+        </select>
+      </div>
+      
+      <div class="editor-row">
+        <label>Climate Theme</label>
+        <select id="theme_climate">
+          <option value="" ${!this._config.theme_climate ? 'selected' : ''}>Use global</option>
+          <option value="dark" ${this._config.theme_climate === 'dark' ? 'selected' : ''}>Dark Glass</option>
+          <option value="light" ${this._config.theme_climate === 'light' ? 'selected' : ''}>Light Glass</option>
+          <option value="liquid" ${this._config.theme_climate === 'liquid' ? 'selected' : ''}>Liquid Glass</option>
+          <option value="native" ${this._config.theme_climate === 'native' ? 'selected' : ''}>Native HA</option>
+        </select>
+      </div>
+      
+      <div class="editor-row">
+        <label>Covers Theme</label>
+        <select id="theme_covers">
+          <option value="" ${!this._config.theme_covers ? 'selected' : ''}>Use global</option>
+          <option value="dark" ${this._config.theme_covers === 'dark' ? 'selected' : ''}>Dark Glass</option>
+          <option value="light" ${this._config.theme_covers === 'light' ? 'selected' : ''}>Light Glass</option>
+          <option value="liquid" ${this._config.theme_covers === 'liquid' ? 'selected' : ''}>Liquid Glass</option>
+          <option value="native" ${this._config.theme_covers === 'native' ? 'selected' : ''}>Native HA</option>
+        </select>
       </div>
       
       <div class="section-title">Advanced</div>
@@ -262,11 +308,21 @@ class FavoritesGridCardEditor extends HTMLElement {
       }
     });
 
-    ['show_empty_message', 'show_climate_controls', 'show_cover_controls', 'light_compact', 'allow_reorder'].forEach(id => {
+    ['show_empty_message', 'show_climate_controls', 'show_cover_controls', 'light_compact', 'climate_compact', 'cover_compact', 'allow_reorder'].forEach(id => {
       const input = this.shadowRoot.getElementById(id);
       if (input) {
         input.addEventListener('change', (e) => {
           this._updateConfig(id, e.target.checked);
+        });
+      }
+    });
+
+    // Per-category theme selectors
+    ['theme_lights', 'theme_climate', 'theme_covers'].forEach(id => {
+      const select = this.shadowRoot.getElementById(id);
+      if (select) {
+        select.addEventListener('change', (e) => {
+          this._updateConfig(id, e.target.value || null);
         });
       }
     });
@@ -327,6 +383,24 @@ class FavoritesGridCard extends HTMLElement {
     this._longPressEntity = null;
     this._isLongPressing = false;
     this._renameEntityId = null;
+
+    // New: Recently removed tracking
+    this._recentlyRemoved = [];
+    this._showRecentlyRemovedPopup = false;
+
+    // New: Entity picker for quick add
+    this._showEntityPicker = false;
+    this._entityPickerSearch = '';
+
+    // New: Control popup for compact climate/cover
+    this._controlPopupEntityId = null;
+
+    // Bulk delete state
+    this._isSelectionMode = false;
+    this._selectedEntities = new Set();
+
+    // Entity Picker Filter
+    this._entityPickerFilter = 'all';
   }
 
   static getConfigElement() {
@@ -381,19 +455,31 @@ class FavoritesGridCard extends HTMLElement {
         --fgc-accent-secondary: #00acc1;
         --fgc-accent-gradient: linear-gradient(135deg, #00897b, #00acc1);
         
-        --fgc-light-on-bg: linear-gradient(135deg, rgba(255, 180, 80, 0.35), rgba(255, 220, 120, 0.2));
-        --fgc-light-on-border: rgba(255, 190, 90, 0.5);
-        --fgc-light-on-shadow: 0 4px 20px rgba(255, 160, 60, 0.25), inset 0 1px 0 rgba(255,255,255,0.1);
-        --fgc-light-on-icon-bg: linear-gradient(135deg, #ffb347, #ffcc70);
-        --fgc-light-on-icon-shadow: 0 2px 12px rgba(255, 170, 60, 0.6);
+        --fgc-light-on-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(200, 230, 255, 0.1));
+        --fgc-light-on-border: rgba(255, 255, 255, 0.35);
+        --fgc-light-on-shadow: 0 4px 20px rgba(255, 255, 255, 0.15), inset 0 1px 0 rgba(255,255,255,0.2);
+        --fgc-light-on-icon-bg: linear-gradient(135deg, #ffffff, #e0f7fa);
+        --fgc-light-on-icon-shadow: 0 2px 16px rgba(255, 255, 255, 0.5);
         
-        --fgc-climate-cool-bg: linear-gradient(135deg, rgba(40, 45, 50, 0.7), rgba(0, 180, 220, 0.25));
-        --fgc-climate-cool-border: rgba(0, 200, 240, 0.4);
-        --fgc-climate-heat-bg: linear-gradient(135deg, rgba(45, 40, 35, 0.7), rgba(255, 160, 60, 0.2));
-        --fgc-climate-heat-border: rgba(255, 170, 70, 0.4);
+        --fgc-climate-cool-bg: linear-gradient(135deg, rgba(40, 45, 50, 0.7), rgba(79, 195, 247, 0.25));
+        --fgc-climate-cool-border: rgba(79, 195, 247, 0.5);
+        --fgc-climate-cool-shadow: 0 0 20px rgba(79, 195, 247, 0.3);
+        --fgc-climate-heat-bg: linear-gradient(135deg, rgba(45, 40, 35, 0.7), rgba(255, 183, 77, 0.25));
+        --fgc-climate-heat-border: rgba(255, 183, 77, 0.5);
+        --fgc-climate-heat-shadow: 0 0 20px rgba(255, 183, 77, 0.3);
+        --fgc-climate-fan-bg: linear-gradient(135deg, rgba(40, 40, 45, 0.7), rgba(189, 189, 189, 0.2));
+        --fgc-climate-fan-border: rgba(189, 189, 189, 0.4);
+        --fgc-climate-fan-shadow: 0 0 15px rgba(189, 189, 189, 0.2);
+        --fgc-climate-auto-bg: linear-gradient(135deg, rgba(40, 40, 50, 0.7), rgba(149, 117, 205, 0.25));
+        --fgc-climate-auto-border: rgba(149, 117, 205, 0.5);
+        --fgc-climate-auto-shadow: 0 0 20px rgba(149, 117, 205, 0.3);
+        --fgc-climate-dry-bg: linear-gradient(135deg, rgba(45, 42, 35, 0.7), rgba(255, 167, 38, 0.2));
+        --fgc-climate-dry-border: rgba(255, 167, 38, 0.45);
+        --fgc-climate-dry-shadow: 0 0 15px rgba(255, 167, 38, 0.25);
         
-        --fgc-cover-open-bg: linear-gradient(135deg, rgba(92, 107, 192, 0.25), rgba(121, 134, 203, 0.15));
-        --fgc-cover-open-border: rgba(92, 107, 192, 0.4);
+        --fgc-cover-open-bg: linear-gradient(135deg, rgba(40, 50, 40, 0.7), rgba(129, 199, 132, 0.2));
+        --fgc-cover-open-border: rgba(129, 199, 132, 0.5);
+        --fgc-cover-open-shadow: 0 0 20px rgba(129, 199, 132, 0.3);
       `,
 
       light: `
@@ -426,19 +512,31 @@ class FavoritesGridCard extends HTMLElement {
         --fgc-accent-secondary: #0097a7;
         --fgc-accent-gradient: linear-gradient(135deg, #00796b, #0097a7);
         
-        --fgc-light-on-bg: linear-gradient(135deg, rgba(255, 193, 7, 0.25), rgba(255, 224, 130, 0.2));
-        --fgc-light-on-border: rgba(255, 160, 0, 0.4);
-        --fgc-light-on-shadow: 0 4px 20px rgba(255, 160, 0, 0.15), inset 0 1px 0 rgba(255,255,255,0.5);
-        --fgc-light-on-icon-bg: linear-gradient(135deg, #ffa726, #ffcc02);
-        --fgc-light-on-icon-shadow: 0 2px 12px rgba(255, 160, 0, 0.4);
+        --fgc-light-on-bg: linear-gradient(135deg, rgba(0, 150, 136, 0.15), rgba(0, 188, 212, 0.1));
+        --fgc-light-on-border: rgba(0, 150, 136, 0.35);
+        --fgc-light-on-shadow: 0 4px 20px rgba(0, 150, 136, 0.15), inset 0 1px 0 rgba(255,255,255,0.5);
+        --fgc-light-on-icon-bg: linear-gradient(135deg, #26a69a, #4dd0e1);
+        --fgc-light-on-icon-shadow: 0 2px 12px rgba(0, 150, 136, 0.4);
         
         --fgc-climate-cool-bg: linear-gradient(135deg, rgba(227, 242, 253, 0.9), rgba(179, 229, 252, 0.6));
-        --fgc-climate-cool-border: rgba(3, 169, 244, 0.3);
+        --fgc-climate-cool-border: rgba(79, 195, 247, 0.4);
+        --fgc-climate-cool-shadow: 0 0 15px rgba(79, 195, 247, 0.2);
         --fgc-climate-heat-bg: linear-gradient(135deg, rgba(255, 243, 224, 0.9), rgba(255, 224, 178, 0.6));
-        --fgc-climate-heat-border: rgba(255, 152, 0, 0.3);
+        --fgc-climate-heat-border: rgba(255, 183, 77, 0.4);
+        --fgc-climate-heat-shadow: 0 0 15px rgba(255, 183, 77, 0.2);
+        --fgc-climate-fan-bg: linear-gradient(135deg, rgba(245, 245, 245, 0.9), rgba(224, 224, 224, 0.6));
+        --fgc-climate-fan-border: rgba(158, 158, 158, 0.3);
+        --fgc-climate-fan-shadow: 0 0 10px rgba(158, 158, 158, 0.15);
+        --fgc-climate-auto-bg: linear-gradient(135deg, rgba(237, 231, 246, 0.9), rgba(209, 196, 233, 0.6));
+        --fgc-climate-auto-border: rgba(149, 117, 205, 0.35);
+        --fgc-climate-auto-shadow: 0 0 15px rgba(149, 117, 205, 0.2);
+        --fgc-climate-dry-bg: linear-gradient(135deg, rgba(255, 248, 225, 0.9), rgba(255, 236, 179, 0.6));
+        --fgc-climate-dry-border: rgba(255, 167, 38, 0.35);
+        --fgc-climate-dry-shadow: 0 0 12px rgba(255, 167, 38, 0.18);
         
-        --fgc-cover-open-bg: linear-gradient(135deg, rgba(232, 234, 246, 0.9), rgba(197, 202, 233, 0.6));
-        --fgc-cover-open-border: rgba(92, 107, 192, 0.3);
+        --fgc-cover-open-bg: linear-gradient(135deg, rgba(232, 245, 233, 0.9), rgba(200, 230, 201, 0.6));
+        --fgc-cover-open-border: rgba(129, 199, 132, 0.4);
+        --fgc-cover-open-shadow: 0 0 15px rgba(129, 199, 132, 0.2);
       `,
 
       liquid: `
@@ -471,19 +569,31 @@ class FavoritesGridCard extends HTMLElement {
         --fgc-accent-secondary: #4dd0e1;
         --fgc-accent-gradient: linear-gradient(135deg, #26a69a, #4dd0e1);
         
-        --fgc-light-on-bg: linear-gradient(135deg, rgba(255, 193, 7, 0.3), rgba(255, 235, 59, 0.15));
-        --fgc-light-on-border: rgba(255, 193, 7, 0.5);
-        --fgc-light-on-shadow: 0 4px 24px rgba(255, 193, 7, 0.3), inset 0 0 0 1px rgba(255,255,255,0.15);
-        --fgc-light-on-icon-bg: linear-gradient(135deg, #ffca28, #ffe082);
-        --fgc-light-on-icon-shadow: 0 2px 16px rgba(255, 193, 7, 0.5);
+        --fgc-light-on-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(200, 230, 255, 0.1));
+        --fgc-light-on-border: rgba(255, 255, 255, 0.4);
+        --fgc-light-on-shadow: 0 4px 24px rgba(255, 255, 255, 0.2), inset 0 0 0 1px rgba(255,255,255,0.2);
+        --fgc-light-on-icon-bg: linear-gradient(135deg, #ffffff, #e0f7fa);
+        --fgc-light-on-icon-shadow: 0 2px 20px rgba(255, 255, 255, 0.6);
         
-        --fgc-climate-cool-bg: linear-gradient(135deg, rgba(0, 188, 212, 0.2), rgba(77, 208, 225, 0.1));
-        --fgc-climate-cool-border: rgba(0, 188, 212, 0.4);
-        --fgc-climate-heat-bg: linear-gradient(135deg, rgba(255, 152, 0, 0.2), rgba(255, 183, 77, 0.1));
-        --fgc-climate-heat-border: rgba(255, 152, 0, 0.4);
+        --fgc-climate-cool-bg: linear-gradient(135deg, rgba(79, 195, 247, 0.25), rgba(129, 212, 250, 0.15));
+        --fgc-climate-cool-border: rgba(79, 195, 247, 0.5);
+        --fgc-climate-cool-shadow: 0 0 20px rgba(79, 195, 247, 0.35);
+        --fgc-climate-heat-bg: linear-gradient(135deg, rgba(255, 183, 77, 0.25), rgba(255, 204, 128, 0.15));
+        --fgc-climate-heat-border: rgba(255, 183, 77, 0.5);
+        --fgc-climate-heat-shadow: 0 0 20px rgba(255, 183, 77, 0.35);
+        --fgc-climate-fan-bg: linear-gradient(135deg, rgba(189, 189, 189, 0.2), rgba(224, 224, 224, 0.1));
+        --fgc-climate-fan-border: rgba(189, 189, 189, 0.45);
+        --fgc-climate-fan-shadow: 0 0 15px rgba(189, 189, 189, 0.25);
+        --fgc-climate-auto-bg: linear-gradient(135deg, rgba(149, 117, 205, 0.25), rgba(179, 157, 219, 0.15));
+        --fgc-climate-auto-border: rgba(149, 117, 205, 0.5);
+        --fgc-climate-auto-shadow: 0 0 20px rgba(149, 117, 205, 0.35);
+        --fgc-climate-dry-bg: linear-gradient(135deg, rgba(255, 167, 38, 0.2), rgba(255, 183, 77, 0.1));
+        --fgc-climate-dry-border: rgba(255, 167, 38, 0.45);
+        --fgc-climate-dry-shadow: 0 0 15px rgba(255, 167, 38, 0.3);
         
-        --fgc-cover-open-bg: linear-gradient(135deg, rgba(92, 107, 192, 0.2), rgba(121, 134, 203, 0.1));
-        --fgc-cover-open-border: rgba(92, 107, 192, 0.4);
+        --fgc-cover-open-bg: linear-gradient(135deg, rgba(129, 199, 132, 0.25), rgba(165, 214, 167, 0.15));
+        --fgc-cover-open-border: rgba(129, 199, 132, 0.5);
+        --fgc-cover-open-shadow: 0 0 20px rgba(129, 199, 132, 0.35);
       `,
 
       native: `
@@ -516,19 +626,31 @@ class FavoritesGridCard extends HTMLElement {
         --fgc-accent-secondary: var(--accent-color, #ff9800);
         --fgc-accent-gradient: linear-gradient(135deg, var(--primary-color, #03a9f4), var(--accent-color, #ff9800));
         
-        --fgc-light-on-bg: var(--state-light-active-color, rgba(255, 214, 0, 0.2));
-        --fgc-light-on-border: var(--state-light-active-color, rgba(255, 214, 0, 0.4));
+        --fgc-light-on-bg: var(--primary-color, rgba(3, 169, 244, 0.15));
+        --fgc-light-on-border: var(--primary-color, rgba(3, 169, 244, 0.35));
         --fgc-light-on-shadow: none;
-        --fgc-light-on-icon-bg: var(--state-light-active-color, #ffd600);
+        --fgc-light-on-icon-bg: var(--primary-color, #03a9f4);
         --fgc-light-on-icon-shadow: none;
         
         --fgc-climate-cool-bg: var(--state-climate-cool-color, rgba(33, 150, 243, 0.1));
         --fgc-climate-cool-border: var(--state-climate-cool-color, rgba(33, 150, 243, 0.3));
+        --fgc-climate-cool-shadow: none;
         --fgc-climate-heat-bg: var(--state-climate-heat-color, rgba(255, 152, 0, 0.1));
         --fgc-climate-heat-border: var(--state-climate-heat-color, rgba(255, 152, 0, 0.3));
+        --fgc-climate-heat-shadow: none;
+        --fgc-climate-fan-bg: rgba(158, 158, 158, 0.1);
+        --fgc-climate-fan-border: rgba(158, 158, 158, 0.25);
+        --fgc-climate-fan-shadow: none;
+        --fgc-climate-auto-bg: rgba(149, 117, 205, 0.1);
+        --fgc-climate-auto-border: rgba(149, 117, 205, 0.25);
+        --fgc-climate-auto-shadow: none;
+        --fgc-climate-dry-bg: rgba(255, 167, 38, 0.1);
+        --fgc-climate-dry-border: rgba(255, 167, 38, 0.25);
+        --fgc-climate-dry-shadow: none;
         
-        --fgc-cover-open-bg: var(--state-cover-open-color, rgba(63, 81, 181, 0.1));
-        --fgc-cover-open-border: var(--state-cover-open-color, rgba(63, 81, 181, 0.3));
+        --fgc-cover-open-bg: rgba(76, 175, 80, 0.1);
+        --fgc-cover-open-border: rgba(76, 175, 80, 0.3);
+        --fgc-cover-open-shadow: none;
       `,
     };
 
@@ -633,11 +755,19 @@ class FavoritesGridCard extends HTMLElement {
     const userItems = this._userId ? (users[this._userId] || []) : [];
     this._favorites = userItems;
     this._entityIds = new Set(userItems.map(item => item.entity_id));
+
+    // Sync recently removed from sensor
+    const recentlyRemovedSensor = this._hass.states['sensor.favorites_recently_removed'];
+    const recentlyRemovedUsers = recentlyRemovedSensor?.attributes?.users || {};
+    this._recentlyRemoved = this._userId ? (recentlyRemovedUsers[this._userId] || []) : [];
+
     this._smartRender();
   }
 
   _smartRender() {
-    const newKey = this._favorites.map(f => f.entity_id).join(',') + '_' + (this._config.theme || 'dark');
+    // Include popup states in render key to ensure they trigger re-renders
+    const popupState = `${this._showEntityPicker}_${this._showRecentlyRemovedPopup}_${this._controlPopupEntityId || ''}`;
+    const newKey = this._favorites.map(f => f.entity_id).join(',') + '_' + (this._config.theme || 'dark') + '_' + popupState;
 
     if (newKey === this._renderedKey && !this._isFirstRender) {
       this._updateStates();
@@ -666,6 +796,9 @@ class FavoritesGridCard extends HTMLElement {
         item.classList.toggle('is-on', isOn);
         item.classList.toggle('is-cooling', mode === 'cool');
         item.classList.toggle('is-heating', mode === 'heat');
+        item.classList.toggle('is-fan-only', mode === 'fan_only');
+        item.classList.toggle('is-auto', mode === 'auto' || mode === 'heat_cool');
+        item.classList.toggle('is-dry', mode === 'dry');
         item.classList.toggle('is-off', !isOn);
 
         const modeEl = item.querySelector('.climate-center-state');
@@ -764,6 +897,67 @@ class FavoritesGridCard extends HTMLElement {
 
     const countEl = this.shadowRoot?.querySelector('.count');
     if (countEl) countEl.textContent = `${this._favorites.length} items`;
+
+    // Update control popup content if open
+    if (this._controlPopupEntityId) {
+      this._updateControlPopupContent();
+    }
+  }
+
+  _updateControlPopupContent() {
+    if (!this._controlPopupEntityId || !this._hass) return;
+
+    const entity = this._hass.states[this._controlPopupEntityId];
+    if (!entity) return;
+
+    const domain = this._controlPopupEntityId.split('.')[0];
+
+    if (domain === 'climate') {
+      const temp = entity.attributes?.temperature || 22;
+      const mode = entity.state || 'off';
+      const fanMode = entity.attributes?.fan_mode;
+      const isOn = mode !== 'off' && mode !== 'unavailable';
+
+      // Update temperature display
+      const tempDisplay = this.shadowRoot?.querySelector('.control-temp-display');
+      if (tempDisplay) {
+        tempDisplay.innerHTML = `${isOn ? temp : '--'}<span>°</span>`;
+      }
+
+      // Update mode buttons
+      this.shadowRoot?.querySelectorAll('.control-popup .control-mode-btn[data-mode]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+      });
+
+      // Update fan mode buttons
+      this.shadowRoot?.querySelectorAll('.control-popup .control-mode-btn[data-fan-mode]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.fanMode === fanMode);
+      });
+    } else if (domain === 'cover') {
+      const position = entity.attributes?.current_position ?? 100;
+      const state = entity.state;
+
+      // Update position display
+      const posDisplay = this.shadowRoot?.querySelector('.control-cover-position');
+      if (posDisplay) {
+        posDisplay.innerHTML = `${position}<span>%</span>`;
+      }
+
+      // Update slider
+      const slider = this.shadowRoot?.querySelector('.control-cover-slider');
+      if (slider) {
+        slider.value = position;
+      }
+
+      // Update action buttons
+      this.shadowRoot?.querySelectorAll('.control-cover-btn').forEach(btn => {
+        const action = btn.dataset.action;
+        btn.classList.toggle('active',
+          (action === 'open' && state === 'open') ||
+          (action === 'close' && state === 'closed')
+        );
+      });
+    }
   }
 
   // ============================================
@@ -1003,6 +1197,90 @@ class FavoritesGridCard extends HTMLElement {
   // ============================================
   // COMMON METHODS
   // ============================================
+
+  _toggleSelectionMode(enable) {
+    this._isSelectionMode = enable;
+    this._selectedEntities.clear();
+
+    // Toggle class on the main card container for CSS-based visibility
+    const card = this.shadowRoot.querySelector('.card');
+    if (card) {
+      if (enable) card.classList.add('selection-mode');
+      else card.classList.remove('selection-mode');
+    }
+
+    // Clear any selected items visually
+    this.shadowRoot.querySelectorAll('.item.selected').forEach(el => {
+      el.classList.remove('selected');
+    });
+
+    this._updateHeaderButtons();
+  }
+
+  _toggleItemSelection(entityId, element) {
+    if (this._selectedEntities.has(entityId)) {
+      this._selectedEntities.delete(entityId);
+      element.classList.remove('selected');
+    } else {
+      this._selectedEntities.add(entityId);
+      element.classList.add('selected');
+    }
+    this._updateHeaderButtons();
+  }
+
+  _updateHeaderButtons() {
+    // Direct DOM manipulation for zero-lag updates
+    const deleteBtn = this.shadowRoot.querySelector('.selection-delete-btn');
+    if (!deleteBtn) return;
+
+    if (this._selectedEntities.size > 0) {
+      deleteBtn.classList.add('active');
+      let countSpan = deleteBtn.querySelector('.delete-count');
+      if (!countSpan) {
+        countSpan = document.createElement('span');
+        countSpan.className = 'delete-count';
+        deleteBtn.appendChild(countSpan);
+      }
+      countSpan.textContent = this._selectedEntities.size;
+    } else {
+      deleteBtn.classList.remove('active');
+      const countSpan = deleteBtn.querySelector('.delete-count');
+      if (countSpan) countSpan.remove();
+    }
+  }
+
+  async _performBulkDelete() {
+    if (this._selectedEntities.size === 0) return;
+
+    // Visual removal
+    for (const entityId of this._selectedEntities) {
+      const item = this.shadowRoot.querySelector(`[data-entity="${entityId}"]`);
+      if (item) item.classList.add('removing');
+    }
+
+    await new Promise(r => setTimeout(r, 200));
+
+    // Actual removal
+    const entitiesToRemove = Array.from(this._selectedEntities);
+
+    for (const entityId of entitiesToRemove) {
+      this._entityIds.delete(entityId);
+      this._favorites = this._favorites.filter(f => f.entity_id !== entityId);
+    }
+
+    this._lastSensorIds = JSON.stringify(Array.from(this._entityIds));
+    this._toggleSelectionMode(false); // Exit mode
+    this._smartRender(); // Full render to update grid
+
+    // Backend calls
+    for (const entityId of entitiesToRemove) {
+      await this._hass.callService('favorites', 'remove', {
+        entity_id: entityId,
+        user_id: this._userId
+      });
+    }
+  }
+
   async _removeFavorite(entityId, e) {
     e.stopPropagation();
 
@@ -1028,6 +1306,44 @@ class FavoritesGridCard extends HTMLElement {
     if (['switch', 'fan', 'input_boolean'].includes(domain)) {
       this._hass.callService(domain, 'toggle', { entity_id: entityId });
     }
+  }
+
+  async _autoSort() {
+    // Sort entities by domain priority to optimize grid layout
+    // Priority: lights first (compact, span 2), then climate/covers (span 4), then standard items (span 2)
+    const domainPriority = {
+      'light': 1,
+      'switch': 2,
+      'fan': 3,
+      'input_boolean': 4,
+      'lock': 5,
+      'sensor': 6,
+      'binary_sensor': 7,
+      'media_player': 8,
+      'climate': 10,  // Larger items last for better grid filling
+      'cover': 11,
+    };
+
+    const getDomainPriority = (fav) => {
+      const domain = fav.entity_id.split('.')[0];
+      return domainPriority[domain] ?? 9;
+    };
+
+    // Sort favorites by domain priority
+    const sortedFavorites = [...this._favorites].sort((a, b) => {
+      return getDomainPriority(a) - getDomainPriority(b);
+    });
+
+    // Update local state
+    this._favorites = sortedFavorites;
+    this._lastSensorIds = JSON.stringify(sortedFavorites.map(f => f.entity_id));
+    this._smartRender();
+
+    // Persist the new order to the backend
+    await this._hass.callService('favorites', 'reorder', {
+      user_id: this._userId,
+      entity_ids: sortedFavorites.map(f => f.entity_id),
+    });
   }
 
   _getIcon(fav) {
@@ -1087,11 +1403,238 @@ class FavoritesGridCard extends HTMLElement {
           justify-content: space-between;
           margin-bottom: 16px;
           padding: 0 4px;
+          gap: 12px;
         }
+        .header-left {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .header-right {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .quick-add-btn {
+          width: 28px;
+          height: 28px;
+          border-radius: 8px;
+          border: none;
+          background: var(--fgc-accent-gradient);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s;
+          flex-shrink: 0;
+        }
+        .quick-add-btn:hover {
+          transform: scale(1.1);
+          box-shadow: 0 4px 12px rgba(0, 172, 193, 0.4);
+        }
+        .quick-add-btn:active {
+          transform: scale(0.95);
+        }
+        .quick-add-btn ha-icon {
+          color: white;
+          --mdc-icon-size: 16px;
+        }
+        .recently-removed-btn {
+          width: 28px;
+          height: 28px;
+          border-radius: 8px;
+          border: none;
+          background: var(--fgc-button-bg);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s;
+          position: relative;
+        }
+        .recently-removed-btn:hover {
+          background: var(--fgc-button-hover-bg);
+          transform: scale(1.05);
+        }
+        .recently-removed-btn ha-icon {
+          color: var(--fgc-icon-color);
+          --mdc-icon-size: 16px;
+        }
+        .recently-removed-btn .badge {
+          position: absolute;
+          top: -4px;
+          right: -4px;
+          background: #f44336;
+          color: white;
+          font-size: 9px;
+          font-weight: 600;
+          min-width: 14px;
+          height: 14px;
+          border-radius: 7px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 3px;
+        }
+        .auto-sort-btn {
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
+          border: none;
+          background: var(--fgc-button-bg);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.15s;
+        }
+        .auto-sort-btn:hover {
+          background: var(--fgc-button-hover-bg);
+          transform: scale(1.05);
+        }
+        .auto-sort-btn ha-icon {
+          color: var(--fgc-icon-color);
+          --mdc-icon-size: 18px;
+        }
+        
+        /* New Bulk Delete Styles */
+        .bulk-delete-btn {
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
+          border: none;
+          background: var(--fgc-button-bg);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.15s;
+        }
+        .bulk-delete-btn:hover {
+          background: rgba(244, 67, 54, 0.2);
+          transform: scale(1.05);
+        }
+        .bulk-delete-btn ha-icon {
+          color: var(--fgc-text-secondary);
+          --mdc-icon-size: 18px;
+        }
+        .bulk-delete-btn:hover ha-icon {
+          color: #f44336;
+        }
+        
+        /* Selection Controls */
+        .selection-cancel-btn {
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
+          border: none;
+          background: var(--fgc-button-bg);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.15s;
+        }
+        .selection-cancel-btn:hover {
+          background: var(--fgc-button-hover-bg);
+          transform: scale(1.05);
+        }
+        .selection-cancel-btn ha-icon {
+          color: var(--fgc-icon-color);
+          --mdc-icon-size: 18px;
+        }
+        
+        .selection-delete-btn {
+          height: 32px;
+          padding: 0 12px;
+          border-radius: 8px;
+          border: none;
+          background: var(--fgc-button-bg);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          transition: all 0.15s;
+          opacity: 0.5;
+        }
+        .selection-delete-btn.active {
+          background: rgba(244, 67, 54, 0.2);
+          opacity: 1;
+        }
+        .selection-delete-btn:hover {
+          background: rgba(244, 67, 54, 0.3);
+          transform: scale(1.02);
+        }
+        .selection-delete-btn ha-icon {
+          color: #f44336;
+          --mdc-icon-size: 18px;
+        }
+        .selection-delete-btn .delete-count {
+          color: #f44336;
+          font-size: 13px;
+          font-weight: 600;
+        }
+        
+        /* Selection Circle - Key Performance Optimization */
+        /* Always exists in DOM, hidden by default via CSS */
+        .selection-circle {
+          position: absolute;
+          top: 8px;
+          left: 8px;
+          width: 22px;
+          height: 22px;
+          border-radius: 50%;
+          border: 2px solid rgba(255, 255, 255, 0.5);
+          background: rgba(0, 0, 0, 0.3);
+          display: none; /* Hidden by default */
+          align-items: center;
+          justify-content: center;
+          z-index: 10;
+          transition: all 0.15s ease;
+          pointer-events: none; /* Let clicks pass through to item handler */
+        }
+        
+        /* Show when card has selection-mode class */
+        .card.selection-mode .selection-circle {
+          display: flex;
+        }
+        
+        /* Item Selected State */
+        .item.selected .selection-circle {
+          background: var(--fgc-accent-gradient);
+          border-color: transparent;
+          box-shadow: 0 2px 8px rgba(0, 137, 123, 0.4);
+        }
+        .item.selected {
+          box-shadow: 0 0 0 2px var(--fgc-accent-primary), 0 4px 12px rgba(0, 137, 123, 0.3);
+        }
+        .selection-circle ha-icon {
+          color: transparent; /* Checkmark hidden when not selected */
+          --mdc-icon-size: 14px;
+          transition: color 0.15s;
+        }
+        .item.selected .selection-circle ha-icon {
+          color: white; /* Checkmark shows when selected */
+        }
+        
+        /* Disable interaction with inner elements in selection mode */
+        .card.selection-mode .item > *:not(.selection-circle) {
+          pointer-events: none;
+        }
+
+        /* Header Button Toggling */
+        .selection-header-buttons { display: none; align-items: center; gap: 8px; }
+        .normal-header-buttons { display: flex; align-items: center; gap: 8px; }
+        
+        .card.selection-mode .selection-header-buttons { display: flex; }
+        .card.selection-mode .normal-header-buttons { display: none; }
+
         .title { 
           font-size: 14px; 
           font-weight: 600; 
-          color: var(--fgc-text-primary); 
+          color: var(--fgc-text-primary);
+          flex: 1;
         }
         .count { 
           font-size: 12px; 
@@ -1105,6 +1648,7 @@ class FavoritesGridCard extends HTMLElement {
           display: grid;
           grid-template-columns: repeat(${cols}, minmax(0, 1fr));
           grid-auto-rows: minmax(28px, auto);
+          grid-auto-flow: dense;
           gap: 10px;
           align-items: start;
         }
@@ -1174,7 +1718,7 @@ class FavoritesGridCard extends HTMLElement {
           background: var(--fgc-light-on-icon-bg);
           box-shadow: var(--fgc-light-on-icon-shadow);
         }
-        .light-item.is-on .icon-wrap ha-icon { color: #fff; }
+        .light-item.is-on .icon-wrap ha-icon { color: #222; }
         .light-item.is-on .state { color: var(--fgc-accent-secondary); }
         
         .light-item .item-info { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
@@ -1194,8 +1738,9 @@ class FavoritesGridCard extends HTMLElement {
         }
 
         .cover-item.is-open {
-          background: linear-gradient(135deg, rgba(25, 25, 28, 0.65), rgba(0, 137, 180, 0.15));
-          border-color: rgba(0, 172, 193, 0.3);
+          background: var(--fgc-cover-open-bg);
+          border-color: var(--fgc-cover-open-border);
+          box-shadow: var(--fgc-cover-open-shadow);
         }
 
         .cover-header {
@@ -1233,8 +1778,8 @@ class FavoritesGridCard extends HTMLElement {
         
         .cover-item.is-open .cover-icon-wrap,
         .cover-item.is-moving .cover-icon-wrap {
-          background: linear-gradient(135deg, #00897b, #00acc1);
-          box-shadow: 0 4px 12px rgba(0, 172, 193, 0.4);
+          background: linear-gradient(135deg, #66bb6a, #81c784);
+          box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
         }
         
         .cover-icon-wrap ha-icon {
@@ -1463,17 +2008,52 @@ class FavoritesGridCard extends HTMLElement {
         .climate-item.is-cooling {
           background: var(--fgc-climate-cool-bg);
           border-color: var(--fgc-climate-cool-border);
-          box-shadow: 0 4px 20px rgba(0, 180, 220, 0.15), inset 0 1px 0 rgba(255,255,255,0.08);
+          box-shadow: var(--fgc-climate-cool-shadow);
+        }
+        .climate-item.is-cooling .climate-icon-btn {
+          background: linear-gradient(135deg, #4fc3f7, #81d4fa);
+          box-shadow: 0 4px 16px rgba(79, 195, 247, 0.5);
         }
         
-        .climate-item.is-heating .climate-icon-btn {
-          background: linear-gradient(135deg, #ff9800, #ffb74d);
-          box-shadow: 0 4px 16px rgba(255, 160, 60, 0.5);
-        }
         .climate-item.is-heating {
           background: var(--fgc-climate-heat-bg);
           border-color: var(--fgc-climate-heat-border);
-          box-shadow: 0 4px 20px rgba(255, 140, 40, 0.15), inset 0 1px 0 rgba(255,255,255,0.08);
+          box-shadow: var(--fgc-climate-heat-shadow);
+        }
+        .climate-item.is-heating .climate-icon-btn {
+          background: linear-gradient(135deg, #ffb74d, #ffcc80);
+          box-shadow: 0 4px 16px rgba(255, 183, 77, 0.5);
+        }
+        
+        .climate-item.is-fan-only {
+          background: var(--fgc-climate-fan-bg);
+          border-color: var(--fgc-climate-fan-border);
+          box-shadow: var(--fgc-climate-fan-shadow);
+        }
+        .climate-item.is-fan-only .climate-icon-btn {
+          background: linear-gradient(135deg, #bdbdbd, #e0e0e0);
+          box-shadow: 0 4px 16px rgba(189, 189, 189, 0.4);
+        }
+        .climate-item.is-fan-only .climate-icon-btn ha-icon { color: #333; }
+        
+        .climate-item.is-auto {
+          background: var(--fgc-climate-auto-bg);
+          border-color: var(--fgc-climate-auto-border);
+          box-shadow: var(--fgc-climate-auto-shadow);
+        }
+        .climate-item.is-auto .climate-icon-btn {
+          background: linear-gradient(135deg, #9575cd, #b39ddb);
+          box-shadow: 0 4px 16px rgba(149, 117, 205, 0.5);
+        }
+        
+        .climate-item.is-dry {
+          background: var(--fgc-climate-dry-bg);
+          border-color: var(--fgc-climate-dry-border);
+          box-shadow: var(--fgc-climate-dry-shadow);
+        }
+        .climate-item.is-dry .climate-icon-btn {
+          background: linear-gradient(135deg, #ffa726, #ffb74d);
+          box-shadow: 0 4px 16px rgba(255, 167, 38, 0.5);
         }
         
         .climate-info {
@@ -1857,14 +2437,654 @@ class FavoritesGridCard extends HTMLElement {
         .empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.3; }
         .empty-text { color: var(--fgc-text-secondary); font-size: 13px; }
         
+        /* Compact Items */
+        .compact-item {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 12px 14px;
+          min-height: auto;
+          cursor: pointer;
+          transition: all 0.15s;
+          grid-row: span 2;
+        }
+        .compact-item:hover {
+          background: var(--fgc-button-hover-bg);
+        }
+        .compact-item > ha-icon {
+          color: var(--fgc-icon-color);
+          --mdc-icon-size: 22px;
+        }
+        .compact-climate.is-cooling {
+          background: rgba(41, 182, 246, 0.15) !important;
+          border: 1px solid #29b6f6 !important;
+          box-shadow: 0 0 15px rgba(41, 182, 246, 0.6), inset 0 0 10px rgba(41, 182, 246, 0.2) !important;
+        }
+        .compact-climate.is-cooling > ha-icon {
+          color: #29b6f6;
+        }
+		.compact-climate.is-heating {
+          background: rgba(255, 167, 38, 0.15) !important;
+          border: 1px solid #ffa726 !important;
+          box-shadow: 0 0 15px rgba(255, 167, 38, 0.6), inset 0 0 10px rgba(255, 167, 38, 0.2) !important;
+        }        
+        .compact-climate.is-heating > ha-icon {
+          color: #ffa726;
+        }
+        .compact-climate.is-fan-only {
+          background: rgba(189, 189, 189, 0.15) !important;
+          border: 1px solid #e0e0e0 !important;
+          box-shadow: 0 0 12px rgba(224, 224, 224, 0.4), inset 0 0 8px rgba(224, 224, 224, 0.1) !important;
+        }
+        .compact-climate.is-fan-only > ha-icon {
+          color: #e0e0e0 !important;
+        }
+        .compact-climate.is-auto {
+          background: rgba(149, 117, 205, 0.15) !important;
+          border: 1px solid #9575cd !important;
+          box-shadow: 0 0 15px rgba(149, 117, 205, 0.6), inset 0 0 10px rgba(149, 117, 205, 0.2) !important;
+        }
+        .compact-climate.is-auto > ha-icon {
+          color: #9575cd !important;
+        }
+        .compact-climate.is-dry {
+          background: rgba(255, 152, 0, 0.15) !important;
+          border: 1px solid #ff9800 !important;
+          box-shadow: 0 0 15px rgba(255, 152, 0, 0.6), inset 0 0 10px rgba(255, 152, 0, 0.2) !important;
+        }
+        .compact-climate.is-dry > ha-icon {
+          color: #ff9800 !important;
+        }        
+		.compact-cover.is-open {
+          background: rgba(102, 187, 106, 0.15) !important;
+          border: 1px solid #66bb6a !important; /* Bright Green */
+          box-shadow: 0 0 15px rgba(102, 187, 106, 0.6), inset 0 0 10px rgba(102, 187, 106, 0.2) !important;
+        }
+        .compact-cover.is-open > ha-icon {
+          color: #66bb6a;
+        }
+        .compact-info {
+          flex: 1;
+          min-width: 0;
+        }
+        .compact-name {
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--fgc-text-primary);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .compact-state {
+          font-size: 11px;
+          color: var(--fgc-text-secondary);
+          margin-top: 2px;
+        }
+        .compact-expand-btn {
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
+          border: none;
+          background: var(--fgc-button-bg);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.15s;
+          flex-shrink: 0;
+        }
+        .compact-expand-btn:hover {
+          background: var(--fgc-button-hover-bg);
+          transform: scale(1.05);
+        }
+        .compact-expand-btn ha-icon {
+          color: var(--fgc-icon-color);
+          --mdc-icon-size: 18px;
+        }
+        
+        /* Entity Picker Overlay */
+        .entity-picker-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.7);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 10001;
+          opacity: 0;
+          visibility: hidden;
+          transition: opacity 0.2s, visibility 0.2s;
+          backdrop-filter: blur(4px);
+        }
+        .entity-picker-overlay.show {
+          opacity: 1;
+          visibility: visible;
+        }
+        .entity-picker-popup {
+          background: var(--fgc-dropdown-bg);
+          border: 1px solid var(--fgc-dropdown-border);
+          border-radius: 20px;
+          padding: 20px;
+          width: 320px;
+          max-width: 90vw;
+          max-height: 70vh;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+          transform: scale(0.9);
+          transition: transform 0.2s;
+          display: flex;
+          flex-direction: column;
+        }
+        .entity-picker-overlay.show .entity-picker-popup {
+          transform: scale(1);
+        }
+        .entity-picker-title {
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--fgc-text-primary);
+          margin-bottom: 16px;
+          text-align: center;
+        }
+        .entity-picker-search {
+          width: 100%;
+          padding: 12px 14px;
+          border: 1px solid var(--fgc-dropdown-border);
+          border-radius: 12px;
+          background: var(--fgc-item-bg);
+          color: var(--fgc-text-primary);
+          font-size: 14px;
+          outline: none;
+          margin-bottom: 12px;
+          box-sizing: border-box;
+        }
+        .entity-picker-search:focus {
+          border-color: var(--fgc-accent-primary);
+        }
+        
+        .entity-picker-filters {
+          display: flex;
+          gap: 8px;
+          margin-bottom: 12px;
+          overflow-x: auto;
+          padding-bottom: 8px; /* More space for scrollbar */
+          scrollbar-width: thin;
+          scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+        }
+        .entity-picker-filters::-webkit-scrollbar {
+          height: 4px;
+          display: block; /* Show scrollbar */
+        }
+        .entity-picker-filters::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .entity-picker-filters::-webkit-scrollbar-thumb {
+          background-color: rgba(255, 255, 255, 0.2);
+          border-radius: 4px;
+        }
+        .entity-picker-filters::-webkit-scrollbar-thumb:hover {
+          background-color: rgba(255, 255, 255, 0.4);
+        }
+        
+        .filter-chip {
+          padding: 6px 14px;
+          border-radius: 20px;
+          background: var(--fgc-button-bg);
+          border: 1px solid var(--fgc-item-border);
+          color: var(--fgc-text-secondary);
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: all 0.2s;
+          flex-shrink: 0;
+        }
+        .filter-chip:hover {
+          background: var(--fgc-button-hover-bg);
+          color: var(--fgc-text-primary);
+        }
+        .filter-chip.active {
+          background: var(--fgc-accent-gradient);
+          border-color: transparent;
+          color: white;
+          box-shadow: 0 4px 12px rgba(0, 137, 123, 0.3);
+        }
+
+        .entity-picker-list {
+          flex: 1;
+          overflow-y: auto;
+          max-height: 300px;
+        }
+        .entity-picker-item {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 12px;
+          border-radius: 10px;
+          cursor: pointer;
+          transition: background 0.15s;
+        }
+        .entity-picker-item:hover {
+          background: var(--fgc-button-hover-bg);
+        }
+        .entity-picker-item ha-icon {
+          color: var(--fgc-icon-color);
+          --mdc-icon-size: 20px;
+        }
+        .entity-picker-item-name {
+          flex: 1;
+          font-size: 13px;
+          color: var(--fgc-text-primary);
+        }
+        .entity-picker-item-id {
+          font-size: 10px;
+          color: var(--fgc-text-tertiary);
+        }
+        .entity-picker-close {
+          margin-top: 12px;
+          padding: 10px;
+          border: none;
+          border-radius: 10px;
+          background: var(--fgc-button-bg);
+          color: var(--fgc-text-primary);
+          font-size: 13px;
+          cursor: pointer;
+        }
+        .entity-picker-close:hover {
+          background: var(--fgc-button-hover-bg);
+        }
+        
+        /* Recently Removed Overlay */
+        .recently-removed-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.7);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 10002;
+          opacity: 0;
+          visibility: hidden;
+          transition: opacity 0.2s, visibility 0.2s;
+          backdrop-filter: blur(4px);
+        }
+        .recently-removed-overlay.show {
+          opacity: 1;
+          visibility: visible;
+        }
+        .recently-removed-popup {
+          background: var(--fgc-dropdown-bg);
+          border: 1px solid var(--fgc-dropdown-border);
+          border-radius: 20px;
+          padding: 20px;
+          width: 300px;
+          max-width: 90vw;
+          max-height: 60vh;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+          transform: scale(0.9);
+          transition: transform 0.2s;
+          display: flex;
+          flex-direction: column;
+        }
+        .recently-removed-overlay.show .recently-removed-popup {
+          transform: scale(1);
+        }
+        .recently-removed-title {
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--fgc-text-primary);
+          margin-bottom: 16px;
+          text-align: center;
+        }
+        .recently-removed-list {
+          flex: 1;
+          overflow-y: auto;
+          max-height: 250px;
+        }
+        .recently-removed-item {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 12px;
+          border-radius: 10px;
+          margin-bottom: 4px;
+          background: var(--fgc-item-bg);
+        }
+        .recently-removed-item-info {
+          flex: 1;
+          min-width: 0;
+        }
+        .recently-removed-item-name {
+          font-size: 13px;
+          color: var(--fgc-text-primary);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .recently-removed-item-time {
+          font-size: 10px;
+          color: var(--fgc-text-tertiary);
+        }
+        .restore-btn {
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
+          border: none;
+          background: var(--fgc-accent-gradient);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s;
+        }
+        .restore-btn:hover {
+          transform: scale(1.1);
+        }
+        .restore-btn ha-icon {
+          color: white;
+          --mdc-icon-size: 16px;
+        }
+        .recently-removed-empty {
+          text-align: center;
+          padding: 20px;
+          color: var(--fgc-text-secondary);
+          font-size: 13px;
+        }
+        .recently-removed-actions {
+          display: flex;
+          gap: 8px;
+          margin-top: 12px;
+        }
+        .recently-removed-btn {
+          flex: 1;
+          padding: 10px;
+          border: none;
+          border-radius: 10px;
+          font-size: 12px;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .recently-removed-btn.close {
+          background: var(--fgc-button-bg);
+          color: var(--fgc-text-primary);
+        }
+        .recently-removed-btn.close:hover {
+          background: var(--fgc-button-hover-bg);
+        }
+        .recently-removed-btn.clear {
+          background: rgba(244, 67, 54, 0.2);
+          color: rgba(244, 67, 54, 0.9);
+        }
+        .recently-removed-btn.clear:hover {
+          background: rgba(244, 67, 54, 0.3);
+        }
+        
+        /* Control Popup - Custom Glass Style */
+        .control-popup-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.75);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 10003;
+          opacity: 0;
+          visibility: hidden;
+          transition: opacity 0.25s, visibility 0.25s;
+          backdrop-filter: blur(8px);
+        }
+        .control-popup-overlay.show {
+          opacity: 1;
+          visibility: visible;
+        }
+        .control-popup {
+          background: var(--fgc-dropdown-bg);
+          border: 1px solid var(--fgc-dropdown-border);
+          border-radius: 24px;
+          padding: 24px;
+          width: 280px;
+          max-width: 90vw;
+          box-shadow: 0 25px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255,255,255,0.08);
+          transform: scale(0.9) translateY(10px);
+          transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .control-popup-overlay.show .control-popup {
+          transform: scale(1) translateY(0);
+        }
+        .control-popup-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 20px;
+        }
+        .control-popup-title {
+          font-size: 15px;
+          font-weight: 600;
+          color: var(--fgc-text-primary);
+        }
+        .control-popup-close {
+          width: 28px;
+          height: 28px;
+          border-radius: 8px;
+          border: none;
+          background: var(--fgc-button-bg);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .control-popup-close:hover {
+          background: var(--fgc-button-hover-bg);
+        }
+        .control-popup-close ha-icon {
+          color: var(--fgc-icon-color);
+          --mdc-icon-size: 16px;
+        }
+        
+        /* Climate Control Popup Content */
+        .control-temp-section {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 16px;
+          margin-bottom: 24px;
+        }
+        .control-temp-btn {
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          border: 1px solid var(--fgc-item-border);
+          background: var(--fgc-item-bg);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.15s;
+        }
+        .control-temp-btn:hover {
+          background: var(--fgc-button-hover-bg);
+          transform: scale(1.1);
+        }
+        .control-temp-btn:active {
+          transform: scale(0.95);
+        }
+        .control-temp-btn ha-icon {
+          color: var(--fgc-icon-color);
+          --mdc-icon-size: 20px;
+        }
+        .control-temp-display {
+          font-size: 40px;
+          font-weight: 600;
+          color: var(--fgc-text-primary);
+          min-width: 80px;
+          text-align: center;
+        }
+        .control-temp-display span {
+          font-size: 20px;
+          opacity: 0.6;
+        }
+        
+        .control-mode-section {
+          margin-bottom: 20px;
+        }
+        .control-mode-label {
+          font-size: 11px;
+          font-weight: 500;
+          color: var(--fgc-text-secondary);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-bottom: 10px;
+        }
+        .control-mode-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 8px;
+        }
+        .control-mode-btn {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 4px;
+          padding: 10px 4px;
+          border-radius: 12px;
+          border: 1px solid var(--fgc-item-border);
+          background: var(--fgc-item-bg);
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .control-mode-btn:hover {
+          background: var(--fgc-button-hover-bg);
+        }
+        .control-mode-btn.active {
+          background: var(--fgc-accent-gradient);
+          border-color: transparent;
+        }
+        .control-mode-btn ha-icon {
+          color: var(--fgc-icon-color);
+          --mdc-icon-size: 18px;
+        }
+        .control-mode-btn.active ha-icon {
+          color: white;
+        }
+        .control-mode-btn span {
+          font-size: 9px;
+          color: var(--fgc-text-secondary);
+        }
+        .control-mode-btn.active span {
+          color: rgba(255,255,255,0.9);
+        }
+        
+        /* Cover Control Popup Content */
+        .control-cover-section {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 20px;
+        }
+        .control-cover-position {
+          font-size: 48px;
+          font-weight: 600;
+          color: var(--fgc-text-primary);
+        }
+        .control-cover-position span {
+          font-size: 18px;
+          opacity: 0.6;
+        }
+        .control-cover-slider {
+          width: 100%;
+          height: 6px;
+          border-radius: 3px;
+          background: var(--fgc-item-bg);
+          appearance: none;
+          outline: none;
+        }
+        .control-cover-slider::-webkit-slider-thumb {
+          appearance: none;
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          background: var(--fgc-accent-gradient);
+          cursor: pointer;
+        }
+        .control-cover-buttons {
+          display: flex;
+          gap: 12px;
+        }
+        .control-cover-btn {
+          width: 52px;
+          height: 52px;
+          border-radius: 16px;
+          border: 1px solid var(--fgc-item-border);
+          background: var(--fgc-item-bg);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.15s;
+        }
+        .control-cover-btn:hover {
+          background: var(--fgc-button-hover-bg);
+          transform: scale(1.05);
+        }
+        .control-cover-btn.active {
+          background: var(--fgc-accent-gradient);
+          border-color: transparent;
+        }
+        .control-cover-btn ha-icon {
+          color: var(--fgc-icon-color);
+          --mdc-icon-size: 24px;
+        }
+        .control-cover-btn.active ha-icon {
+          color: white;
+        }
+        
         ${customStyle}
       </style>
       
       <div class="card">
-        ${this._config.title ? `
+        ${this._config.title !== false ? `
           <div class="header">
-            <span class="title">${this._config.title}</span>
-            <span class="count">${this._favorites.length} items</span>
+            <div class="header-left">
+              <button class="quick-add-btn" title="Add entity">
+                <ha-icon icon="mdi:plus"></ha-icon>
+              </button>
+              <span class="title">${this._config.title || 'Favorites'}</span>
+            </div>
+            <div class="header-right">
+              <!-- Selection Mode Buttons -->
+              <div class="selection-header-buttons">
+                <button class="selection-cancel-btn" title="Cancel selection">
+                  <ha-icon icon="mdi:close"></ha-icon>
+                </button>
+                <button class="selection-delete-btn ${this._selectedEntities.size > 0 ? 'active' : ''}" title="Delete selected">
+                  <ha-icon icon="mdi:delete"></ha-icon>
+                  ${this._selectedEntities.size > 0 ? `<span class="delete-count">${this._selectedEntities.size}</span>` : ''}
+                </button>
+              </div>
+
+              <!-- Normal Mode Buttons -->
+              <div class="normal-header-buttons">
+                <button class="auto-sort-btn" title="Auto-sort entities">
+                  <ha-icon icon="mdi:sort"></ha-icon>
+                </button>
+                <button class="recently-removed-btn" title="Recently removed">
+                  <ha-icon icon="mdi:history"></ha-icon>
+                  ${this._recentlyRemoved.length > 0 ? `<span class="badge">${this._recentlyRemoved.length}</span>` : ''}
+                </button>
+                <button class="bulk-delete-btn" title="Select items to delete">
+                  <ha-icon icon="mdi:delete-outline"></ha-icon>
+                </button>
+              </div>
+
+              <span class="count">${this._favorites.length} items</span>
+            </div>
           </div>
         ` : ''}
         
@@ -1890,12 +3110,168 @@ class FavoritesGridCard extends HTMLElement {
           </div>
           <div class="rename-reset-row">
             <button class="rename-btn reset">Reset to Default</button>
+            <button class="rename-btn delete" style="flex: 1;">Remove</button>
           </div>
         </div>
+      </div>
+      
+      <div class="entity-picker-overlay ${this._showEntityPicker ? 'show' : ''}">
+        <div class="entity-picker-popup">
+          <div class="entity-picker-title">Add to Favorites</div>
+          <input type="text" class="entity-picker-search" placeholder="Search entities..." value="${this._entityPickerSearch}">
+          
+          <div class="entity-picker-filters">
+            <button class="filter-chip ${this._entityPickerFilter === 'all' ? 'active' : ''}" data-filter="all">All</button>
+            <button class="filter-chip ${this._entityPickerFilter === 'light' ? 'active' : ''}" data-filter="light">Lights</button>
+            <button class="filter-chip ${this._entityPickerFilter === 'climate' ? 'active' : ''}" data-filter="climate">Climate</button>
+            <button class="filter-chip ${this._entityPickerFilter === 'cover' ? 'active' : ''}" data-filter="cover">Covers</button>
+            <button class="filter-chip ${this._entityPickerFilter === 'switch' ? 'active' : ''}" data-filter="switch">Switches</button>
+            <button class="filter-chip ${this._entityPickerFilter === 'fan' ? 'active' : ''}" data-filter="fan">Fans</button>
+          </div>
+
+          <div class="entity-picker-list">
+            ${this._renderEntityPickerList()}
+          </div>
+          <button class="entity-picker-close">Close</button>
+        </div>
+      </div>
+      
+      <div class="recently-removed-overlay ${this._showRecentlyRemovedPopup ? 'show' : ''}">
+        <div class="recently-removed-popup">
+          <div class="recently-removed-title">Recently Removed</div>
+          <div class="recently-removed-list">
+            ${this._recentlyRemoved.length === 0 ? `
+              <div class="recently-removed-empty">No recently removed items</div>
+            ` : this._recentlyRemoved.map(item => `
+              <div class="recently-removed-item" data-entity="${item.entity_id}">
+                <div class="recently-removed-item-info">
+                  <div class="recently-removed-item-name">${item.custom_name || this._getFriendlyName(item.entity_id)}</div>
+                  <div class="recently-removed-item-time">${this._formatTimeAgo(item.removed_at)}</div>
+                </div>
+                <button class="restore-btn" data-entity="${item.entity_id}" title="Restore">
+                  <ha-icon icon="mdi:restore"></ha-icon>
+                </button>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+      
+      <div class="control-popup-overlay ${this._controlPopupEntityId ? 'show' : ''}">
+        ${this._renderControlPopup()}
       </div>
     `;
 
     this._attachEventListeners();
+  }
+
+  _renderControlPopup() {
+    if (!this._controlPopupEntityId || !this._hass) return '';
+
+    const entity = this._hass.states[this._controlPopupEntityId];
+    if (!entity) return '';
+
+    const domain = this._controlPopupEntityId.split('.')[0];
+    const name = entity.attributes?.friendly_name || this._controlPopupEntityId.split('.')[1];
+
+    if (domain === 'climate') {
+      return this._renderClimateControlPopup(entity, name);
+    } else if (domain === 'cover') {
+      return this._renderCoverControlPopup(entity, name);
+    }
+    return '';
+  }
+
+  _renderClimateControlPopup(entity, name) {
+    const temp = entity.attributes?.temperature || 22;
+    const mode = entity.state || 'off';
+    const modes = entity.attributes?.hvac_modes || ['off', 'cool', 'heat', 'auto'];
+    const fanModes = entity.attributes?.fan_modes || [];
+    const currentFanMode = entity.attributes?.fan_mode || 'auto';
+    const isOn = mode !== 'off' && mode !== 'unavailable';
+
+    return `
+      <div class="control-popup">
+        <div class="control-popup-header">
+          <div class="control-popup-title">${name}</div>
+          <button class="control-popup-close">
+            <ha-icon icon="mdi:close"></ha-icon>
+          </button>
+        </div>
+        
+        <div class="control-temp-section">
+          <button class="control-temp-btn" data-action="temp-down">
+            <ha-icon icon="mdi:minus"></ha-icon>
+          </button>
+          <div class="control-temp-display">${isOn ? temp : '--'}<span>°</span></div>
+          <button class="control-temp-btn" data-action="temp-up">
+            <ha-icon icon="mdi:plus"></ha-icon>
+          </button>
+        </div>
+        
+        <div class="control-mode-section">
+          <div class="control-mode-label">Mode</div>
+          <div class="control-mode-grid">
+            ${modes.map(m => `
+              <button class="control-mode-btn ${m === mode ? 'active' : ''}" data-mode="${m}">
+                <ha-icon icon="${this._getClimateIcon(m)}"></ha-icon>
+                <span>${this._getModeLabel(m)}</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+        
+        ${fanModes.length > 0 ? `
+          <div class="control-mode-section">
+            <div class="control-mode-label">Fan</div>
+            <div class="control-mode-grid">
+              ${fanModes.slice(0, 4).map(fm => `
+                <button class="control-mode-btn ${fm === currentFanMode ? 'active' : ''}" data-fan-mode="${fm}">
+                  <ha-icon icon="${this._getFanIcon(fm)}"></ha-icon>
+                  <span>${fm}</span>
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  _renderCoverControlPopup(entity, name) {
+    const position = entity.attributes?.current_position ?? 100;
+    const state = entity.state;
+
+    return `
+      <div class="control-popup">
+        <div class="control-popup-header">
+          <div class="control-popup-title">${name}</div>
+          <button class="control-popup-close">
+            <ha-icon icon="mdi:close"></ha-icon>
+          </button>
+        </div>
+        
+        <div class="control-cover-section">
+          <div class="control-cover-position">${position}<span>%</span></div>
+          
+          <input type="range" class="control-cover-slider" 
+                 min="0" max="100" value="${position}" 
+                 data-entity="${this._controlPopupEntityId}">
+          
+          <div class="control-cover-buttons">
+            <button class="control-cover-btn ${state === 'open' ? 'active' : ''}" data-action="open">
+              <ha-icon icon="mdi:arrow-up"></ha-icon>
+            </button>
+            <button class="control-cover-btn" data-action="stop">
+              <ha-icon icon="mdi:stop"></ha-icon>
+            </button>
+            <button class="control-cover-btn ${state === 'closed' ? 'active' : ''}" data-action="close">
+              <ha-icon icon="mdi:arrow-down"></ha-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   _renderItem(fav) {
@@ -1903,8 +3279,14 @@ class FavoritesGridCard extends HTMLElement {
     const entity = this._hass?.states[fav.entity_id];
 
     if (domain === 'climate') {
+      if (this._config.climate_compact) {
+        return this._renderCompactClimateItem(fav, entity);
+      }
       return this._renderClimateItem(fav, entity);
     } else if (domain === 'cover') {
+      if (this._config.cover_compact) {
+        return this._renderCompactCoverItem(fav, entity);
+      }
       return this._renderCoverItem(fav, entity);
     } else if (domain === 'light' && this._config.light_compact) {
       return this._renderLightItem(fav, entity);
@@ -1912,6 +3294,142 @@ class FavoritesGridCard extends HTMLElement {
       return this._renderStandardItem(fav, entity);
     }
   }
+
+  _renderCompactClimateItem(fav, entity) {
+    const isOn = entity && entity.state !== 'off' && entity.state !== 'unavailable';
+    const mode = entity?.state || 'off';
+    const temp = entity?.attributes?.temperature;
+    const allowReorder = this._config.allow_reorder !== false;
+
+    return `
+      <div class="item compact-item compact-climate ${isOn ? 'is-on' : 'is-off'} ${mode === 'cool' ? 'is-cooling' : ''} ${mode === 'heat' ? 'is-heating' : ''}" 
+           data-entity="${fav.entity_id}"
+           ${allowReorder ? `draggable="true"` : ''}>
+        <div class="selection-circle"><ha-icon icon="mdi:check"></ha-icon></div>
+        <ha-icon icon="${this._getClimateIcon(mode)}"></ha-icon>
+        <div class="compact-info">
+          <div class="compact-name">${this._getName(fav)}</div>
+          <div class="compact-state">${isOn ? `${temp}° · ${mode}` : 'Off'}</div>
+        </div>
+        <button class="compact-expand-btn" data-entity="${fav.entity_id}" title="Open controls">
+          <ha-icon icon="mdi:chevron-right"></ha-icon>
+        </button>
+      </div>
+    `;
+  }
+
+  _renderCompactCoverItem(fav, entity) {
+    const state = entity?.state || 'unknown';
+    const position = entity?.attributes?.current_position;
+    const isOpen = state === 'open';
+    const isClosed = state === 'closed';
+    const allowReorder = this._config.allow_reorder !== false;
+
+    return `
+      <div class="item compact-item compact-cover ${isOpen ? 'is-open' : ''} ${isClosed ? 'is-closed' : ''}" 
+           data-entity="${fav.entity_id}"
+           ${allowReorder ? `draggable="true"` : ''}>
+        <div class="selection-circle"><ha-icon icon="mdi:check"></ha-icon></div>
+        <ha-icon icon="mdi:window-shutter${isClosed ? '' : '-open'}"></ha-icon>
+        <div class="compact-info">
+          <div class="compact-name">${this._getName(fav)}</div>
+          <div class="compact-state">${position !== undefined ? `${position}%` : state}</div>
+        </div>
+        <button class="compact-expand-btn" data-entity="${fav.entity_id}" title="Open controls">
+          <ha-icon icon="mdi:chevron-right"></ha-icon>
+        </button>
+      </div>
+    `;
+  }
+
+  _renderEntityPickerList() {
+    if (!this._hass) return '';
+
+    const search = this._entityPickerSearch.toLowerCase();
+    const favoriteIds = this._entityIds;
+    const filter = this._entityPickerFilter;
+
+    // Get all entities excluding already favorited ones
+    const entities = Object.keys(this._hass.states)
+      .filter(entityId => !favoriteIds.has(entityId))
+      .filter(entityId => {
+        // Domain Filter
+        if (filter !== 'all') {
+          if (!entityId.startsWith(filter + '.')) return false;
+        }
+
+        const entity = this._hass.states[entityId];
+        const name = entity.attributes?.friendly_name || entityId;
+        return name.toLowerCase().includes(search) || entityId.toLowerCase().includes(search);
+      })
+      .sort((a, b) => {
+        const nameA = this._hass.states[a]?.attributes?.friendly_name || a;
+        const nameB = this._hass.states[b]?.attributes?.friendly_name || b;
+        return nameA.localeCompare(nameB);
+      })
+      .slice(0, 50);
+
+    if (entities.length === 0) {
+      return `<div class="recently-removed-empty">No entities found</div>`;
+    }
+
+    return entities.map(entityId => {
+      const entity = this._hass.states[entityId];
+      const name = entity.attributes?.friendly_name || entityId;
+      const domain = entityId.split('.')[0];
+      const icon = this._getDomainIcon(domain, entity);
+
+      return `
+        <div class="entity-picker-item" data-entity="${entityId}">
+          <ha-icon icon="${icon}"></ha-icon>
+          <div class="entity-picker-item-name">
+            ${name}
+            <div class="entity-picker-item-id">${entityId}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  _getFriendlyName(entityId) {
+    const entity = this._hass?.states[entityId];
+    return entity?.attributes?.friendly_name || entityId.split('.')[1]?.replace(/_/g, ' ') || entityId;
+  }
+
+  _formatTimeAgo(isoString) {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
+  }
+
+  _getDomainIcon(domain, entity) {
+    const icons = {
+      light: 'mdi:lightbulb',
+      switch: 'mdi:light-switch',
+      climate: 'mdi:thermostat',
+      cover: 'mdi:window-shutter',
+      sensor: 'mdi:eye',
+      binary_sensor: 'mdi:checkbox-blank-circle',
+      fan: 'mdi:fan',
+      media_player: 'mdi:cast',
+      camera: 'mdi:cctv',
+      lock: 'mdi:lock',
+      script: 'mdi:script',
+      automation: 'mdi:robot',
+      scene: 'mdi:palette'
+    };
+    return entity?.attributes?.icon || icons[domain] || 'mdi:help-circle';
+  }
+
 
   _renderClimateItem(fav, entity) {
     const isOn = entity && entity.state !== 'off' && entity.state !== 'unavailable';
@@ -1935,6 +3453,7 @@ class FavoritesGridCard extends HTMLElement {
       <div class="item climate-item ${isOn ? 'is-on' : 'is-off'} ${mode === 'cool' ? 'is-cooling' : ''} ${mode === 'heat' ? 'is-heating' : ''}" 
            data-entity="${fav.entity_id}"
            ${allowReorder ? `draggable="true"` : ''}>
+        <div class="selection-circle"><ha-icon icon="mdi:check"></ha-icon></div>
         
         <div class="climate-header">
           <div class="climate-left">
@@ -1999,6 +3518,7 @@ class FavoritesGridCard extends HTMLElement {
       <div class="item light-item ${isOn ? 'is-on' : ''}" 
            data-entity="${fav.entity_id}"
            ${allowReorder ? `draggable="true"` : ''}>
+        <div class="selection-circle"><ha-icon icon="mdi:check"></ha-icon></div>
         <div class="icon-wrap">
           <ha-icon icon="${this._getIcon(fav)}"></ha-icon>
         </div>
@@ -2042,6 +3562,7 @@ class FavoritesGridCard extends HTMLElement {
       <div class="item cover-item ${isOpen ? 'is-open' : ''} ${isClosed ? 'is-closed' : ''} ${isMoving ? 'is-moving' : ''}" 
            data-entity="${fav.entity_id}"
            ${allowReorder ? `draggable="true"` : ''}>
+        <div class="selection-circle"><ha-icon icon="mdi:check"></ha-icon></div>
         
         <div class="cover-header">
           <div class="cover-info">
@@ -2087,6 +3608,7 @@ class FavoritesGridCard extends HTMLElement {
       <div class="item standard-item ${isOn ? 'is-on' : ''}" 
            data-entity="${fav.entity_id}"
            ${allowReorder ? `draggable="true"` : ''}>
+        <div class="selection-circle"><ha-icon icon="mdi:check"></ha-icon></div>
         <div class="item-top">
           <div class="icon-wrap">
             <ha-icon icon="${this._getIcon(fav)}"></ha-icon>
@@ -2105,6 +3627,10 @@ class FavoritesGridCard extends HTMLElement {
 
     this.shadowRoot.querySelectorAll('.light-item').forEach(el => {
       el.addEventListener('click', (e) => {
+        if (this._isSelectionMode) {
+          this._toggleItemSelection(el.dataset.entity, el);
+          return;
+        }
         if (!this._draggedItem) {
           this._toggleLight(el.dataset.entity, e);
         }
@@ -2113,8 +3639,46 @@ class FavoritesGridCard extends HTMLElement {
 
     this.shadowRoot.querySelectorAll('.standard-item').forEach(el => {
       el.addEventListener('click', (e) => {
+        if (this._isSelectionMode) {
+          this._toggleItemSelection(el.dataset.entity, el);
+          return;
+        }
         if (!this._draggedItem) {
           this._toggleEntity(el.dataset.entity);
+        }
+      });
+    });
+
+    // Climate/Cover items don't have a generic click handler normally, 
+    // but need one for selection mode
+    this.shadowRoot.querySelectorAll('.climate-item, .cover-item').forEach(el => {
+      el.addEventListener('click', (e) => {
+        if (this._isSelectionMode) {
+          this._toggleItemSelection(el.dataset.entity, el);
+        }
+      });
+    });
+
+    // Compact expand buttons (open control popup)
+    this.shadowRoot.querySelectorAll('.compact-expand-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const entityId = btn.dataset.entity;
+        if (entityId) {
+          this._showControlPopup(entityId);
+        }
+      });
+    });
+
+    // Also allow clicking the compact item itself to open popup
+    this.shadowRoot.querySelectorAll('.compact-item').forEach(el => {
+      el.addEventListener('click', (e) => {
+        if (this._isSelectionMode) {
+          this._toggleItemSelection(el.dataset.entity, el);
+          return;
+        }
+        if (!this._draggedItem && !e.target.closest('.compact-expand-btn')) {
+          this._showControlPopup(el.dataset.entity);
         }
       });
     });
@@ -2201,6 +3765,303 @@ class FavoritesGridCard extends HTMLElement {
         if (e.key === 'Escape') this._hideRenamePopup();
       });
     }
+
+    // Quick Add Button
+    const quickAddBtn = this.shadowRoot.querySelector('.quick-add-btn');
+    if (quickAddBtn) {
+      quickAddBtn.addEventListener('click', () => {
+        this._showEntityPicker = true;
+        this._entityPickerSearch = '';
+        this._smartRender();
+        setTimeout(() => {
+          const searchInput = this.shadowRoot.querySelector('.entity-picker-search');
+          if (searchInput) searchInput.focus();
+        }, 100);
+      });
+    }
+
+    // Auto Sort Button
+    const autoSortBtn = this.shadowRoot.querySelector('.auto-sort-btn');
+    if (autoSortBtn) {
+      autoSortBtn.addEventListener('click', () => {
+        this._autoSort();
+      });
+    }
+
+    // Recently Removed Button
+    const recentlyRemovedBtn = this.shadowRoot.querySelector('.recently-removed-btn');
+    if (recentlyRemovedBtn) {
+      recentlyRemovedBtn.addEventListener('click', () => {
+        this._showRecentlyRemovedPopup = true;
+        this._smartRender();
+      });
+    }
+
+    // Bulk Delete Button - Enter selection mode
+    const bulkDeleteBtn = this.shadowRoot.querySelector('.bulk-delete-btn');
+    if (bulkDeleteBtn) {
+      bulkDeleteBtn.addEventListener('click', () => {
+        this._toggleSelectionMode(true);
+      });
+    }
+
+    // Selection Cancel Button - Exit selection mode
+    const selectionCancelBtn = this.shadowRoot.querySelector('.selection-cancel-btn');
+    if (selectionCancelBtn) {
+      selectionCancelBtn.addEventListener('click', () => {
+        this._toggleSelectionMode(false);
+      });
+    }
+
+    // Selection Delete Button - Perform bulk delete
+    const selectionDeleteBtn = this.shadowRoot.querySelector('.selection-delete-btn');
+    if (selectionDeleteBtn) {
+      selectionDeleteBtn.addEventListener('click', () => {
+        this._performBulkDelete();
+      });
+    }
+
+    // Entity Picker Overlay
+    const entityPickerOverlay = this.shadowRoot.querySelector('.entity-picker-overlay');
+    if (entityPickerOverlay) {
+      entityPickerOverlay.addEventListener('click', (e) => {
+        if (e.target === entityPickerOverlay) {
+          this._showEntityPicker = false;
+          this._smartRender();
+        }
+      });
+    }
+
+    // Entity Picker Search
+    const pickerSearch = this.shadowRoot.querySelector('.entity-picker-search');
+    if (pickerSearch) {
+      pickerSearch.addEventListener('input', (e) => {
+        this._entityPickerSearch = e.target.value;
+        const list = this.shadowRoot.querySelector('.entity-picker-list');
+        if (list) {
+          list.innerHTML = this._renderEntityPickerList();
+          this._attachEntityPickerItemListeners();
+        }
+      });
+    }
+
+    // Entity Picker Filters
+    this.shadowRoot.querySelectorAll('.filter-chip').forEach(chip => {
+      chip.addEventListener('click', (e) => {
+        // Update active state visually immediately for responsiveness
+        this.shadowRoot.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        e.target.classList.add('active');
+
+        // Update state and re-render list
+        this._entityPickerFilter = e.target.dataset.filter;
+        const list = this.shadowRoot.querySelector('.entity-picker-list');
+        if (list) {
+          list.innerHTML = this._renderEntityPickerList();
+          this._attachEntityPickerItemListeners();
+        }
+      });
+    });
+
+    // Entity Picker Close
+    const pickerClose = this.shadowRoot.querySelector('.entity-picker-close');
+    if (pickerClose) {
+      pickerClose.addEventListener('click', () => {
+        this._showEntityPicker = false;
+        this._smartRender();
+      });
+    }
+
+    // Attach entity picker item listeners
+    this._attachEntityPickerItemListeners();
+
+    // Recently Removed Overlay
+    const recentlyRemovedOverlay = this.shadowRoot.querySelector('.recently-removed-overlay');
+    if (recentlyRemovedOverlay) {
+      recentlyRemovedOverlay.addEventListener('click', (e) => {
+        if (e.target === recentlyRemovedOverlay) {
+          this._showRecentlyRemovedPopup = false;
+          this._smartRender();
+        }
+      });
+    }
+
+    // Recently Removed Close Button
+    const recentlyRemovedClose = this.shadowRoot.querySelector('.recently-removed-btn.close');
+    if (recentlyRemovedClose) {
+      recentlyRemovedClose.addEventListener('click', () => {
+        this._showRecentlyRemovedPopup = false;
+        this._smartRender();
+      });
+    }
+
+    // Recently Removed Clear Button
+    const recentlyRemovedClear = this.shadowRoot.querySelector('.recently-removed-btn.clear');
+    if (recentlyRemovedClear) {
+      recentlyRemovedClear.addEventListener('click', () => {
+        this._clearRecentlyRemoved();
+      });
+    }
+
+    // Restore Buttons
+    this.shadowRoot.querySelectorAll('.restore-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const entityId = btn.dataset.entity;
+        if (entityId) {
+          this._restoreEntity(entityId);
+        }
+      });
+    });
+
+    // Control Popup Overlay
+    const controlPopupOverlay = this.shadowRoot.querySelector('.control-popup-overlay');
+    if (controlPopupOverlay) {
+      controlPopupOverlay.addEventListener('click', (e) => {
+        if (e.target === controlPopupOverlay) {
+          this._controlPopupEntityId = null;
+          this._smartRender();
+        }
+      });
+    }
+
+    // Control Popup Close Button
+    const controlPopupClose = this.shadowRoot.querySelector('.control-popup-close');
+    if (controlPopupClose) {
+      controlPopupClose.addEventListener('click', () => {
+        this._controlPopupEntityId = null;
+        this._smartRender();
+      });
+    }
+
+    // Control Popup Temperature Buttons
+    this.shadowRoot.querySelectorAll('.control-temp-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const action = btn.dataset.action;
+        if (action === 'temp-up') {
+          this._controlPopupTempChange(1);
+        } else if (action === 'temp-down') {
+          this._controlPopupTempChange(-1);
+        }
+      });
+    });
+
+    // Control Popup Mode Buttons
+    this.shadowRoot.querySelectorAll('.control-popup .control-mode-btn[data-mode]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.mode;
+        if (mode && this._controlPopupEntityId) {
+          this._hass.callService('climate', 'set_hvac_mode', {
+            entity_id: this._controlPopupEntityId,
+            hvac_mode: mode
+          });
+        }
+      });
+    });
+
+    // Control Popup Fan Mode Buttons
+    this.shadowRoot.querySelectorAll('.control-popup .control-mode-btn[data-fan-mode]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const fanMode = btn.dataset.fanMode;
+        if (fanMode && this._controlPopupEntityId) {
+          this._hass.callService('climate', 'set_fan_mode', {
+            entity_id: this._controlPopupEntityId,
+            fan_mode: fanMode
+          });
+        }
+      });
+    });
+
+    // Control Popup Cover Buttons
+    this.shadowRoot.querySelectorAll('.control-cover-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const action = btn.dataset.action;
+        if (action && this._controlPopupEntityId) {
+          this._hass.callService('cover', `${action}_cover`, {
+            entity_id: this._controlPopupEntityId
+          });
+        }
+      });
+    });
+
+    // Control Popup Cover Slider
+    const coverSlider = this.shadowRoot.querySelector('.control-cover-slider');
+    if (coverSlider) {
+      coverSlider.addEventListener('change', (e) => {
+        const position = parseInt(e.target.value);
+        if (this._controlPopupEntityId) {
+          this._hass.callService('cover', 'set_cover_position', {
+            entity_id: this._controlPopupEntityId,
+            position: position
+          });
+        }
+      });
+    }
+  }
+
+  _controlPopupTempChange(delta) {
+    if (!this._controlPopupEntityId || !this._hass) return;
+    const entity = this._hass.states[this._controlPopupEntityId];
+    if (!entity) return;
+
+    const currentTemp = entity.attributes?.temperature || 22;
+    const newTemp = currentTemp + delta;
+
+    this._hass.callService('climate', 'set_temperature', {
+      entity_id: this._controlPopupEntityId,
+      temperature: newTemp
+    });
+  }
+
+  _showControlPopup(entityId) {
+    this._controlPopupEntityId = entityId;
+    this._smartRender();
+  }
+
+  _attachEntityPickerItemListeners() {
+    this.shadowRoot.querySelectorAll('.entity-picker-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const entityId = item.dataset.entity;
+        if (entityId) {
+          this._addFavorite(entityId);
+          this._showEntityPicker = false;
+          this._smartRender();
+        }
+      });
+    });
+  }
+
+  _addFavorite(entityId) {
+    if (!this._hass || !this._userId) return;
+
+    this._hass.callService('favorites', 'add', {
+      user_id: this._userId,
+      entity_id: entityId
+    });
+  }
+
+  _restoreEntity(entityId) {
+    if (!this._hass || !this._userId) return;
+
+    this._hass.callService('favorites', 'restore', {
+      user_id: this._userId,
+      entity_id: entityId
+    });
+
+    // Optimistically update UI
+    this._recentlyRemoved = this._recentlyRemoved.filter(item => item.entity_id !== entityId);
+    this._smartRender();
+  }
+
+  _clearRecentlyRemoved() {
+    if (!this._hass || !this._userId) return;
+
+    this._hass.callService('favorites', 'clear_recently_removed', {
+      user_id: this._userId
+    });
+
+    this._recentlyRemoved = [];
+    this._showRecentlyRemovedPopup = false;
+    this._smartRender();
   }
 
   // ============================================
