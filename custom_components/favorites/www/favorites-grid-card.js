@@ -2608,6 +2608,7 @@ class FavoritesGridCard extends HTMLElement {
           gap: 8px;
           margin-bottom: 12px;
           overflow-x: auto;
+          -webkit-overflow-scrolling: touch; /* Mobile momentum scrolling */
           padding-bottom: 8px; /* More space for scrollbar */
           scrollbar-width: thin;
           scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
