@@ -106,8 +106,12 @@ class FavoritesStore:
         return [item["entity_id"] for item in self.get_user_items(user_id)]
 
     def get_recently_removed_items(self, user_id: str) -> list[dict[str, Any]]:
-        """Return list of recently removed items for a specific user."""
-        return self._data.get("recently_removed", {}).get(user_id, [])
+        """Return list of recently removed items for a specific user, filtering out active favorites."""
+        recently_removed = self._data.get("recently_removed", {}).get(user_id, [])
+        active_ids = self.get_user_entity_ids(user_id)
+        
+        # Filter out items that are currently in favorites (ghosts)
+        return [item for item in recently_removed if item["entity_id"] not in active_ids]
 
     def is_favorite(self, user_id: str, entity_id: str) -> bool:
         """Check if an entity is favorited by a specific user."""
@@ -154,6 +158,15 @@ class FavoritesStore:
 
         new_user_items = [*user_items, new_item]
         self._data["users"] = {**self._data.get("users", {}), user_id: new_user_items}
+        
+        # Check if it was in recently_removed, if so, remove it (it's back!)
+        if user_id in self._data.get("recently_removed", {}):
+            recent = self._data["recently_removed"][user_id]
+            # Filter out this entity
+            new_recent = [x for x in recent if x["entity_id"] != entity_id]
+            if len(new_recent) != len(recent):
+                self._data["recently_removed"][user_id] = new_recent
+
         await self.async_save()
         return True
 
@@ -166,13 +179,20 @@ class FavoritesStore:
         removed_item = None
         new_items = []
         
+        # Determine removal candidate (first match usually, but we want to capture it for history)
+        # scan for ANY match to remove all, but keep one for history
+        found_match = False
+        
         for item in user_items:
             if item["entity_id"] == entity_id:
-                removed_item = item.copy()
+                if not found_match:
+                    removed_item = item.copy()
+                    found_match = True
+                # Skip adding to new_items -> effectively removes ALL duplicates
             else:
                 new_items.append(item)
 
-        if removed_item:
+        if found_match and removed_item:
             # Re-order remaining items
             for i, item in enumerate(new_items):
                 item["order"] = i
@@ -185,12 +205,18 @@ class FavoritesStore:
             if user_id not in self._data["recently_removed"]:
                 self._data["recently_removed"][user_id] = []
             
+            # Check if this specific entity is ALREADY in recently removed (to prevent history spam)
+            # Remove existing history entry if present, so we bump it to the top
+            current_history = [x for x in self._data["recently_removed"][user_id] if x["entity_id"] != entity_id]
+            
             # Add to front of list
-            self._data["recently_removed"][user_id].insert(0, removed_item)
+            current_history.insert(0, removed_item)
             
             # Trim to max items
-            if len(self._data["recently_removed"][user_id]) > self.MAX_RECENTLY_REMOVED:
-                self._data["recently_removed"][user_id] = self._data["recently_removed"][user_id][:self.MAX_RECENTLY_REMOVED]
+            if len(current_history) > self.MAX_RECENTLY_REMOVED:
+                current_history = current_history[:self.MAX_RECENTLY_REMOVED]
+                
+            self._data["recently_removed"][user_id] = current_history
             
             await self.async_save()
             return True
@@ -276,6 +302,15 @@ class FavoritesStore:
                 new_recently_removed.append(item)
         
         if restored_item:
+            # Update history first
+            self._data["recently_removed"][user_id] = new_recently_removed
+            
+            # Check if ALREADY in favorites to prevent duplicate
+            if self.is_favorite(user_id, entity_id):
+                # Just consume the restore action, don't add duplicate
+                await self.async_save()
+                return True
+
             # Add back to favorites
             if user_id not in self._data["users"]:
                 self._data["users"][user_id] = []
@@ -285,7 +320,6 @@ class FavoritesStore:
             restored_item["added_at"] = datetime.now().isoformat()
             
             self._data["users"][user_id] = [*user_items, restored_item]
-            self._data["recently_removed"][user_id] = new_recently_removed
             
             await self.async_save()
             return True
@@ -446,6 +480,13 @@ async def async_register_services(hass: HomeAssistant, store: FavoritesStore) ->
         if await store.async_add(user_id, entity_id, custom_name, custom_icon):
             _LOGGER.info("Added %s to favorites for user %s", entity_id, user_id)
             fire_changed_event("add", user_id, entity_id)
+            
+            # Fire sync event for recently removed (in case we removed it from history)
+            items = store.get_recently_removed_items(user_id)
+            hass.bus.async_fire(
+                EVENT_RECENTLY_REMOVED_CHANGED,
+                {"action": "get", "user_id": user_id, "items": items},
+            )
 
     async def handle_remove(call: ServiceCall) -> None:
         user_id = call.data[ATTR_USER_ID]
@@ -453,6 +494,13 @@ async def async_register_services(hass: HomeAssistant, store: FavoritesStore) ->
         if await store.async_remove(user_id, entity_id):
             _LOGGER.info("Removed %s from favorites for user %s", entity_id, user_id)
             fire_changed_event("remove", user_id, entity_id)
+            
+            # Fire sync event for recently removed (we added to it)
+            items = store.get_recently_removed_items(user_id)
+            hass.bus.async_fire(
+                EVENT_RECENTLY_REMOVED_CHANGED,
+                {"action": "get", "user_id": user_id, "items": items},
+            )
 
     async def handle_toggle(call: ServiceCall) -> None:
         user_id = call.data[ATTR_USER_ID]
@@ -461,6 +509,13 @@ async def async_register_services(hass: HomeAssistant, store: FavoritesStore) ->
         action = "add" if is_fav else "remove"
         _LOGGER.info("Toggled %s for user %s - now %s", entity_id, user_id, "favorited" if is_fav else "not favorited")
         fire_changed_event(action, user_id, entity_id)
+        
+        # Fire sync event for recently removed
+        items = store.get_recently_removed_items(user_id)
+        hass.bus.async_fire(
+            EVENT_RECENTLY_REMOVED_CHANGED,
+            {"action": "get", "user_id": user_id, "items": items},
+        )
 
     async def handle_reorder(call: ServiceCall) -> None:
         user_id = call.data[ATTR_USER_ID]
@@ -488,10 +543,16 @@ async def async_register_services(hass: HomeAssistant, store: FavoritesStore) ->
         if await store.async_restore(user_id, entity_id):
             _LOGGER.info("Restored %s to favorites for user %s", entity_id, user_id)
             fire_changed_event("restore", user_id, entity_id)
-            # Also fire recently removed changed event
+            
+            # Fire sync event for recently removed
+            items = store.get_recently_removed_items(user_id)
             hass.bus.async_fire(
                 EVENT_RECENTLY_REMOVED_CHANGED,
-                {"action": "restore", "user_id": user_id, "entity_id": entity_id},
+                {
+                    "action": "get", 
+                    "user_id": user_id, 
+                    "items": items
+                },
             )
 
     async def handle_set_entity_theme(call: ServiceCall) -> None:

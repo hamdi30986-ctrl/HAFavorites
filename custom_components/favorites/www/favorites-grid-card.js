@@ -800,18 +800,17 @@ class FavoritesGridCard extends HTMLElement {
     this._favorites = userItems;
     this._entityIds = new Set(userItems.map(item => item.entity_id));
 
-    // Sync recently removed from sensor
-    const recentlyRemovedSensor = this._hass.states['sensor.favorites_recently_removed'];
-    const recentlyRemovedUsers = recentlyRemovedSensor?.attributes?.users || {};
-    this._recentlyRemoved = this._userId ? (recentlyRemovedUsers[this._userId] || []) : [];
+    // _recentlyRemoved is managed by the event subscription "favorites_recently_removed_changed"
+    // Do NOT overwrite it here, or it will race condition and wipe the list on favorites update.
 
     this._smartRender();
   }
 
   _smartRender() {
-    // Include popup states in render key to ensure they trigger re-renders
+    // Include popup states and history in render key to ensure they trigger re-renders
     const popupState = `${this._showEntityPicker}_${this._showRecentlyRemovedPopup}_${this._controlPopupEntityId || ''}`;
-    const newKey = this._favorites.map(f => f.entity_id).join(',') + '_' + (this._config.theme || 'dark') + '_' + popupState;
+    const historyState = this._recentlyRemoved.map(r => r.entity_id).join(',');
+    const newKey = this._favorites.map(f => f.entity_id).join(',') + '_' + (this._config.theme || 'dark') + '_' + popupState + '_' + historyState;
 
     if (newKey === this._renderedKey && !this._isFirstRender) {
       this._updateStates();
@@ -4118,10 +4117,7 @@ class FavoritesGridCard extends HTMLElement {
       user_id: this._userId,
       entity_id: entityId
     });
-
-    // Optimistically update UI
-    this._recentlyRemoved = this._recentlyRemoved.filter(item => item.entity_id !== entityId);
-    this._smartRender();
+    // Optimistic update removed: Rely on backend event "get" to update list
   }
 
   _clearRecentlyRemoved() {
