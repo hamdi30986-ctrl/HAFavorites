@@ -15,6 +15,14 @@ class FavoritesGridCardEditor extends HTMLElement {
     this._hass = hass;
   }
 
+  disconnectedCallback() {
+    if (this._unsubRecentlyRemoved) {
+      this._unsubRecentlyRemoved();
+      this._unsubRecentlyRemoved = null;
+    }
+    super.disconnectedCallback && super.disconnectedCallback();
+  }
+
   _render() {
     this.shadowRoot.innerHTML = `
       <style>
@@ -734,6 +742,42 @@ class FavoritesGridCard extends HTMLElement {
     this._hass = hass;
     this._userId = hass.user?.id || null;
 
+
+
+    if (this._userId) {
+      if (!this._unsubRecentlyRemoved) {
+
+
+
+        const handler = (event) => {
+          if (event.data.user_id !== this._userId) return;
+
+          const action = event.data.action;
+
+          if (action === 'get' && event.data.items) {
+            this._recentlyRemoved = event.data.items;
+            this._smartRender();
+          }
+          else if (action === 'clear') {
+            this._recentlyRemoved = [];
+            this._showRecentlyRemovedPopup = false;
+            this._smartRender();
+          }
+        };
+
+        this._hass.connection.subscribeEvents(handler, 'favorites_recently_removed_changed').then(unsub => {
+          this._unsubRecentlyRemoved = unsub;
+
+          if (!this._hasLoadedRecentlyRemoved) {
+            this._hasLoadedRecentlyRemoved = true;
+            this._hass.callService('favorites', 'get_recently_removed', {
+              user_id: this._userId
+            }).catch(err => console.warn('Failed to fetch recently removed history:', err));
+          }
+        });
+      }
+    }
+
     const sensor = hass.states['sensor.favorites_list'];
     const users = sensor?.attributes?.users || {};
     const userItems = this._userId ? (users[this._userId] || []) : [];
@@ -1264,8 +1308,22 @@ class FavoritesGridCard extends HTMLElement {
     const entitiesToRemove = Array.from(this._selectedEntities);
 
     for (const entityId of entitiesToRemove) {
+      // Add to local recently removed (immediate UI update)
+      const fav = this._favorites.find(f => f.entity_id === entityId);
+      if (fav) {
+        this._recentlyRemoved.unshift({
+          ...fav,
+          removed_at: new Date().toISOString()
+        });
+      }
+
       this._entityIds.delete(entityId);
       this._favorites = this._favorites.filter(f => f.entity_id !== entityId);
+    }
+
+    // Trim recently removed to max 20
+    if (this._recentlyRemoved.length > 20) {
+      this._recentlyRemoved = this._recentlyRemoved.slice(0, 20);
     }
 
     this._lastSensorIds = JSON.stringify(Array.from(this._entityIds));
@@ -1288,6 +1346,20 @@ class FavoritesGridCard extends HTMLElement {
     if (item) {
       item.classList.add('removing');
       await new Promise(r => setTimeout(r, 200));
+    }
+
+    // Add to local recently removed (immediate UI update)
+    const fav = this._favorites.find(f => f.entity_id === entityId);
+    if (fav) {
+      this._recentlyRemoved.unshift({
+        ...fav,
+        removed_at: new Date().toISOString()
+      });
+
+      // Trim recently removed to max 20
+      if (this._recentlyRemoved.length > 20) {
+        this._recentlyRemoved = this._recentlyRemoved.slice(0, 20);
+      }
     }
 
     this._entityIds.delete(entityId);
@@ -3077,7 +3149,6 @@ class FavoritesGridCard extends HTMLElement {
                 </button>
                 <button class="recently-removed-btn" title="Recently removed">
                   <ha-icon icon="mdi:history"></ha-icon>
-                  ${this._recentlyRemoved.length > 0 ? `<span class="badge">${this._recentlyRemoved.length}</span>` : ''}
                 </button>
                 <button class="bulk-delete-btn" title="Select items to delete">
                   <ha-icon icon="mdi:delete-outline"></ha-icon>

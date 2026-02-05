@@ -41,6 +41,7 @@ SERVICE_UPDATE = "update"
 SERVICE_RESTORE = "restore"
 SERVICE_SET_ENTITY_THEME = "set_entity_theme"
 SERVICE_CLEAR_RECENTLY_REMOVED = "clear_recently_removed"
+SERVICE_GET_RECENTLY_REMOVED = "get_recently_removed"
 
 ATTR_ENTITY_ID = "entity_id"
 ATTR_USER_ID = "user_id"
@@ -510,6 +511,19 @@ async def async_register_services(hass: HomeAssistant, store: FavoritesStore) ->
             {"action": "clear", "user_id": user_id},
         )
 
+    async def handle_get_recently_removed(call: ServiceCall) -> None:
+        user_id = call.data[ATTR_USER_ID]
+        items = store.get_recently_removed_items(user_id)
+        # Fire event with current list so frontend can update
+        hass.bus.async_fire(
+            EVENT_RECENTLY_REMOVED_CHANGED,
+            {
+                "action": "get", 
+                "user_id": user_id, 
+                "items": items
+            },
+        )
+
     hass.services.async_register(
         DOMAIN, SERVICE_ADD, handle_add,
         schema=vol.Schema({
@@ -579,6 +593,13 @@ async def async_register_services(hass: HomeAssistant, store: FavoritesStore) ->
 
     hass.services.async_register(
         DOMAIN, SERVICE_CLEAR_RECENTLY_REMOVED, handle_clear_recently_removed,
+        schema=vol.Schema({
+            vol.Required(ATTR_USER_ID): cv.string,
+        }),
+    )
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_GET_RECENTLY_REMOVED, handle_get_recently_removed,
         schema=vol.Schema({
             vol.Required(ATTR_USER_ID): cv.string,
         }),
