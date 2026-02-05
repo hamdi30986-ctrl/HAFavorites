@@ -12,8 +12,8 @@ import os  # Moved to top
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, ServiceCall, callback
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, Platform
+from homeassistant.core import CoreState, HomeAssistant, ServiceCall, callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.storage import Store
@@ -368,63 +368,87 @@ async def async_register_resources(hass: HomeAssistant) -> None:
         # 1. Find the path to the integration's www folder
         integration = await async_get_integration(hass, DOMAIN)
         integration_path = integration.file_path
+        version = integration.version
         www_path = os.path.join(integration_path, "www")
         
         if not os.path.isdir(www_path):
             _LOGGER.warning("www directory not found, skipping resource registration")
             return
         
-        # 2. Register the static path so HA serves these files
+        # 2. Register the static path so HA serves these files (IMMEDIATE)
         hass.http.register_static_path(
             ASSET_URL_PATH,
             www_path,
             cache_headers=True
         )
         
-        # 3. Register the resources in Lovelace
-        try:
-            if "lovelace" not in hass.data:
-                _LOGGER.debug("Lovelace not loaded yet, resources will be registered on next restart")
-                return
-            
-            resources = hass.data["lovelace"]["resources"]
-            if not resources:
-                _LOGGER.warning("Lovelace resources collection not available")
-                return
-            
-            card_files = [
-                ("favoritable-card.js", "favoritable-card"),
-                ("favorites-grid-card.js", "favorites-grid-card"),
-            ]
-            
-            for filename, card_type in card_files:
-                file_path = os.path.join(www_path, filename)
-                if not os.path.isfile(file_path):
-                    _LOGGER.warning("Card file not found: %s", filename)
-                    continue
+        # 3. Register the resources in Lovelace (DEFER TO STARTUP)
+        async def register_lovelace_resources(event=None):
+            try:
+                # Wait for Lovelace to be ready
+                if "lovelace" not in hass.data:
+                    _LOGGER.debug("Lovelace not loaded yet, skipping resource registration")
+                    return
                 
-                # UPDATED: Use static URL
-                url = f"{ASSET_URL_PATH}/{filename}"
+                resources = hass.data["lovelace"]["resources"]
+                if not resources:
+                    _LOGGER.warning("Lovelace resources collection not available")
+                    return
                 
-                existing_resources = await resources.async_items()
-                resource_exists = any(
-                    res.get("url") == url and res.get("type") == "module"
-                    for res in existing_resources
-                )
+                card_files = [
+                    ("favoritable-card.js", "favoritable-card"),
+                    ("favorites-grid-card.js", "favorites-grid-card"),
+                ]
                 
-                if not resource_exists:
-                    await resources.async_create_item({
-                        "type": "module",
-                        "url": url,
-                    })
-                    _LOGGER.info("Automatically registered resource: %s", url)
-                else:
-                    _LOGGER.debug("Resource already exists: %s", url)
+                for filename, card_type in card_files:
+                    file_path = os.path.join(www_path, filename)
+                    if not os.path.isfile(file_path):
+                        _LOGGER.warning("Card file not found: %s", filename)
+                        continue
                     
-        except ImportError:
-            _LOGGER.warning("Lovelace resources not available, skipping automatic registration")
-        except Exception as err:
-            _LOGGER.error("Error registering resources: %s", err)
+                    # UPDATED: Use static URL with version for cache busting
+                    url = f"{ASSET_URL_PATH}/{filename}?v={version}"
+                    
+                    try:
+                        existing_resources = await resources.async_items()
+                    except Exception:
+                        _LOGGER.warning("Could not fetch existing resources")
+                        continue
+
+                    # Check if resource exists (ignoring version for duplicate check)
+                    # We want to update the version if the base URL matches
+                    resource_id = None
+                    resource_needs_update = False
+                    
+                    for res in existing_resources:
+                        if res.get("url", "").startswith(f"{ASSET_URL_PATH}/{filename}") and res.get("type") == "module":
+                            resource_id = res.get("id")
+                            if res.get("url") != url:
+                                resource_needs_update = True
+                            break
+                    
+                    if not resource_id:
+                        await resources.async_create_item({
+                            "type": "module",
+                            "url": url,
+                        })
+                        _LOGGER.info("Automatically registered resource: %s", url)
+                    elif resource_needs_update:
+                        await resources.async_update_item(resource_id, {
+                            "url": url,
+                        })
+                        _LOGGER.info("Updated resource version: %s", url)
+                    else:
+                        _LOGGER.debug("Resource already exists and is up to date: %s", url)
+                        
+            except Exception as err:
+                _LOGGER.error("Error in register_lovelace_resources: %s", err)
+
+        # Execute registration immediately if HA is running, otherwise wait for start
+        if hass.state == CoreState.running:
+            await register_lovelace_resources()
+        else:
+            hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, register_lovelace_resources)
             
     except Exception as err:
         _LOGGER.error("Failed to register resources: %s", err)
