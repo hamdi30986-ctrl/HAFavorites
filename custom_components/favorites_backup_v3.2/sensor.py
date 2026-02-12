@@ -52,15 +52,6 @@ class FavoritesSensor(SensorEntity):
         return {
             "users": users,
             "count": total_count,
-            "locked_entities": copy.deepcopy(
-                self._store._data.get("locked_entities", {})
-            ),
-            "locked_users": list(
-                self._store._data.get("locked_users", [])
-            ),
-            "presets": copy.deepcopy(
-                self._store._data.get("presets", {})
-            ),
         }
 
     async def async_added_to_hass(self) -> None:

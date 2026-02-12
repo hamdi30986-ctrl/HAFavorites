@@ -959,41 +959,21 @@ class FavoritesGridCard extends HTMLElement {
       const temp = entity.attributes?.temperature || 22;
       const mode = entity.state || 'off';
       const fanMode = entity.attributes?.fan_mode;
-      const humidity = entity.attributes?.current_humidity;
       const isOn = mode !== 'off' && mode !== 'unavailable';
 
       // Update temperature display
       const tempDisplay = this.shadowRoot?.querySelector('.control-temp-display');
       if (tempDisplay) {
-        tempDisplay.innerHTML = `${isOn ? temp : '--'}<span>°C</span>`;
-      }
-
-      // Update ambient glow
-      const glow = this.shadowRoot?.querySelector('.control-temp-glow');
-      if (glow) {
-        glow.className = 'control-temp-glow' + (isOn ? ` glow-${mode}` : '');
-      }
-
-      // Update humidity
-      const humEl = this.shadowRoot?.querySelector('.control-humidity-badge');
-      if (humEl && humidity != null) {
-        humEl.innerHTML = `<ha-icon icon="mdi:water-percent"></ha-icon>${humidity}%`;
-      }
-
-      // Update ON/OFF toggle
-      const toggle = this.shadowRoot?.querySelector('.control-popup-toggle');
-      if (toggle) {
-        toggle.classList.toggle('is-on', isOn);
-        toggle.querySelector('span').textContent = isOn ? 'ON' : 'OFF';
+        tempDisplay.innerHTML = `${isOn ? temp : '--'}<span>°</span>`;
       }
 
       // Update mode buttons
-      this.shadowRoot?.querySelectorAll('.control-mode-btn[data-mode]').forEach(btn => {
+      this.shadowRoot?.querySelectorAll('.control-popup .control-mode-btn[data-mode]').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.mode === mode);
       });
 
       // Update fan mode buttons
-      this.shadowRoot?.querySelectorAll('.control-popup .control-fan-btn[data-fan-mode]').forEach(btn => {
+      this.shadowRoot?.querySelectorAll('.control-popup .control-mode-btn[data-fan-mode]').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.fanMode === fanMode);
       });
     } else if (domain === 'cover') {
@@ -2914,11 +2894,15 @@ class FavoritesGridCard extends HTMLElement {
         .recently-removed-btn.clear:hover {
           background: rgba(244, 67, 54, 0.3);
         }
-        /* ======= Climate Control Popup ======= */
+        
+        /* Control Popup - Custom Glass Style */
         .control-popup-overlay {
           position: fixed;
-          top: 0; left: 0; right: 0; bottom: 0;
-          background: rgba(0, 0, 0, 0.45);
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.75);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -2933,213 +2917,141 @@ class FavoritesGridCard extends HTMLElement {
           visibility: visible;
         }
         .control-popup {
-          background: linear-gradient(145deg, rgba(42,42,48,0.92), rgba(28,28,32,0.95));
-          backdrop-filter: blur(40px) saturate(160%);
-          -webkit-backdrop-filter: blur(40px) saturate(160%);
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 28px;
+          background: var(--fgc-dropdown-bg);
+          border: 1px solid var(--fgc-dropdown-border);
+          border-radius: 24px;
           padding: 24px;
-          width: 320px;
-          max-width: 92vw;
-          box-shadow: 0 25px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05), inset 0 1px 0 rgba(255,255,255,0.06);
+          width: 280px;
+          max-width: 90vw;
+          box-shadow: 0 25px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255,255,255,0.08);
           transform: scale(0.9) translateY(10px);
           transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
         .control-popup-overlay.show .control-popup {
           transform: scale(1) translateY(0);
         }
-
-        /* Header */
         .control-popup-header {
           display: flex;
-          align-items: flex-start;
+          align-items: center;
           justify-content: space-between;
-          margin-bottom: 22px;
+          margin-bottom: 20px;
         }
-        .control-popup-name-area { display: flex; flex-direction: column; gap: 2px; }
-        .control-popup-title { font-size: 17px; font-weight: 700; color: #f0f0f0; }
-        .control-popup-area { font-size: 12px; color: rgba(255,255,255,0.45); }
-        .control-popup-toggle {
-          display: flex; align-items: center; gap: 6px;
-          padding: 6px 14px 6px 12px; border-radius: 20px; border: none;
-          background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.55);
-          font-size: 12px; font-weight: 600; cursor: pointer;
-          transition: all 0.2s; flex-shrink: 0;
+        .control-popup-title {
+          font-size: 15px;
+          font-weight: 600;
+          color: var(--fgc-text-primary);
         }
-        .control-popup-toggle:hover { background: rgba(255,255,255,0.14); }
-        .control-popup-toggle.is-on { background: rgba(255,255,255,0.18); color: #fff; }
-        .control-popup-toggle ha-icon { --mdc-icon-size: 16px; }
         .control-popup-close {
-          width: 28px; height: 28px; border-radius: 8px; border: none;
-          background: var(--fgc-button-bg); cursor: pointer;
-          display: flex; align-items: center; justify-content: center;
+          width: 28px;
+          height: 28px;
+          border-radius: 8px;
+          border: none;
+          background: var(--fgc-button-bg);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
-        .control-popup-close:hover { background: var(--fgc-button-hover-bg); }
-        .control-popup-close ha-icon { color: var(--fgc-icon-color); --mdc-icon-size: 16px; }
-
-        /* Temperature section + ambient glow */
+        .control-popup-close:hover {
+          background: var(--fgc-button-hover-bg);
+        }
+        .control-popup-close ha-icon {
+          color: var(--fgc-icon-color);
+          --mdc-icon-size: 16px;
+        }
+        
+        /* Climate Control Popup Content */
         .control-temp-section {
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 18px;
-          margin-bottom: 26px;
-          position: relative;
-          padding: 20px 0;
+          gap: 16px;
+          margin-bottom: 24px;
         }
-        /* Ambient mode glow — soft diffused light behind temp area */
-        .control-temp-glow {
-          position: absolute;
-          top: 50%; left: 50%;
-          width: 0; height: 0;
-          transform: translate(-50%, -50%);
-          pointer-events: none;
-          z-index: 0;
-          opacity: 0;
-          background: transparent;
-          transition: opacity 0.5s ease, box-shadow 0.5s ease;
-        }
-        @keyframes glowPulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.6; }
-        }
-        .control-temp-glow.glow-heat {
-          opacity: 1;
-          box-shadow:
-            0 0 25px 15px rgba(255,100,20,0.7),
-            0 0 60px 30px rgba(255,70,10,0.35),
-            0 0 110px 50px rgba(255,50,0,0.12);
-          animation: glowPulse 3s ease-in-out infinite;
-        }
-        .control-temp-glow.glow-cool {
-          opacity: 1;
-          box-shadow:
-            0 0 25px 15px rgba(50,170,255,0.7),
-            0 0 60px 30px rgba(30,130,240,0.35),
-            0 0 110px 50px rgba(20,100,220,0.12);
-          animation: glowPulse 3s ease-in-out infinite;
-        }
-        .control-temp-glow.glow-auto {
-          opacity: 1;
-          box-shadow:
-            0 0 25px 15px rgba(170,110,255,0.65),
-            0 0 60px 30px rgba(130,80,220,0.3),
-            0 0 110px 50px rgba(100,60,200,0.1);
-          animation: glowPulse 3s ease-in-out infinite;
-        }
-        .control-temp-glow.glow-dry {
-          opacity: 1;
-          box-shadow:
-            0 0 25px 15px rgba(60,210,170,0.55),
-            0 0 60px 30px rgba(40,180,150,0.25);
-          animation: glowPulse 3s ease-in-out infinite;
-        }
-        .control-temp-glow.glow-fan_only {
-          opacity: 1;
-          box-shadow:
-            0 0 20px 12px rgba(200,210,220,0.3),
-            0 0 50px 25px rgba(160,170,180,0.1);
-          animation: glowPulse 4s ease-in-out infinite;
-        }
-        .control-humidity-badge {
-          position: absolute;
-          top: 0px;
-          left: 50%;
-          transform: translateX(-50%);
-          font-size: 11px;
-          font-weight: 600;
-          color: rgba(100,220,255,0.85);
+        .control-temp-btn {
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          border: 1px solid var(--fgc-item-border);
+          background: var(--fgc-item-bg);
+          cursor: pointer;
           display: flex;
           align-items: center;
-          gap: 3px;
-          z-index: 1;
-        }
-        .control-humidity-badge ha-icon { --mdc-icon-size: 13px; color: rgba(100,220,255,0.7); }
-        .control-temp-btn {
-          width: 48px; height: 48px;
-          border-radius: 50%; border: none;
-          background: rgba(255,255,255,0.07);
-          cursor: pointer;
-          display: flex; align-items: center; justify-content: center;
+          justify-content: center;
           transition: all 0.15s;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 2px 6px rgba(0,0,0,0.25);
-          position: relative; z-index: 1;
         }
-        .control-temp-btn:hover { background: rgba(255,255,255,0.14); transform: scale(1.08); }
-        .control-temp-btn:active { transform: scale(0.95); }
-        .control-temp-btn ha-icon { color: rgba(255,255,255,0.7); --mdc-icon-size: 22px; }
+        .control-temp-btn:hover {
+          background: var(--fgc-button-hover-bg);
+          transform: scale(1.1);
+        }
+        .control-temp-btn:active {
+          transform: scale(0.95);
+        }
+        .control-temp-btn ha-icon {
+          color: var(--fgc-icon-color);
+          --mdc-icon-size: 20px;
+        }
         .control-temp-display {
-          font-size: 56px;
-          font-weight: 300;
-          letter-spacing: -2px;
-          color: #fff;
-          min-width: 90px;
+          font-size: 40px;
+          font-weight: 600;
+          color: var(--fgc-text-primary);
+          min-width: 80px;
           text-align: center;
-          line-height: 1;
-          padding-top: 18px;
-          position: relative; z-index: 1;
         }
         .control-temp-display span {
-          font-size: 30px;
-          opacity: 0.45;
-          font-weight: 300;
-          margin-left: 2px;
-          vertical-align: top;
-          position: relative;
-          top: 4px;
+          font-size: 20px;
+          opacity: 0.6;
         }
-
-        /* Mode buttons — circular row */
-        .control-mode-section { margin-bottom: 22px; }
+        
+        .control-mode-section {
+          margin-bottom: 20px;
+        }
         .control-mode-label {
-          font-size: 11px; font-weight: 600;
-          color: rgba(255,255,255,0.35);
-          text-transform: uppercase; letter-spacing: 0.8px;
+          font-size: 11px;
+          font-weight: 500;
+          color: var(--fgc-text-secondary);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
           margin-bottom: 10px;
         }
         .control-mode-grid {
-          display: flex; flex-wrap: wrap; justify-content: center;
-          gap: 12px; max-width: 204px; margin: 0 auto;
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 8px;
         }
         .control-mode-btn {
-          width: 52px; height: 52px;
-          border-radius: 50%; border: none;
-          background: rgba(255,255,255,0.06);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 4px;
+          padding: 10px 4px;
+          border-radius: 12px;
+          border: 1px solid var(--fgc-item-border);
+          background: var(--fgc-item-bg);
           cursor: pointer;
-          display: flex; align-items: center; justify-content: center;
-          transition: all 0.2s;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 2px 8px rgba(0,0,0,0.2);
+          transition: all 0.15s;
         }
-        .control-mode-btn:hover { background: rgba(255,255,255,0.12); transform: scale(1.08); }
+        .control-mode-btn:hover {
+          background: var(--fgc-button-hover-bg);
+        }
         .control-mode-btn.active {
-          background: rgba(255,255,255,0.18);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 16px rgba(0,0,0,0.3);
+          background: var(--fgc-accent-gradient);
+          border-color: transparent;
         }
-        .control-mode-btn ha-icon { color: rgba(255,255,255,0.5); --mdc-icon-size: 22px; }
-        .control-mode-btn.active ha-icon { color: #fff; }
-        .control-mode-btn span { display: none; }
-
-        /* Fan level — pill buttons */
-        .control-fan-section { margin-bottom: 4px; }
-        .control-fan-label {
-          font-size: 11px; font-weight: 600;
-          color: rgba(255,255,255,0.35);
-          text-transform: uppercase; letter-spacing: 0.8px;
-          margin-bottom: 10px;
+        .control-mode-btn ha-icon {
+          color: var(--fgc-icon-color);
+          --mdc-icon-size: 18px;
         }
-        .control-fan-grid { display: flex; justify-content: center; gap: 8px; }
-        .control-fan-btn {
-          flex: 1; padding: 10px 6px;
-          border-radius: 14px; border: none;
-          background: rgba(255,255,255,0.06);
-          color: rgba(255,255,255,0.55);
-          font-size: 12px; font-weight: 600;
-          cursor: pointer; text-align: center;
-          transition: all 0.2s;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+        .control-mode-btn.active ha-icon {
+          color: white;
         }
-        .control-fan-btn:hover { background: rgba(255,255,255,0.1); }
-        .control-fan-btn.active { background: rgba(255,255,255,0.18); color: #fff; }
+        .control-mode-btn span {
+          font-size: 9px;
+          color: var(--fgc-text-secondary);
+        }
+        .control-mode-btn.active span {
+          color: rgba(255,255,255,0.9);
+        }
         
         /* Cover Control Popup Content */
         .control-cover-section {
@@ -3344,70 +3256,50 @@ class FavoritesGridCard extends HTMLElement {
   _renderClimateControlPopup(entity, name) {
     const temp = entity.attributes?.temperature || 22;
     const mode = entity.state || 'off';
-    const modes = (entity.attributes?.hvac_modes || ['off', 'cool', 'heat', 'auto']).filter(m => m !== 'off');
+    const modes = entity.attributes?.hvac_modes || ['off', 'cool', 'heat', 'auto'];
     const fanModes = entity.attributes?.fan_modes || [];
     const currentFanMode = entity.attributes?.fan_mode || 'auto';
-    const humidity = entity.attributes?.current_humidity;
     const isOn = mode !== 'off' && mode !== 'unavailable';
-
-    // Resolve area name
-    let areaName = '';
-    try {
-      const entityId = this._controlPopupEntityId;
-      const entityReg = this._hass.entities?.[entityId];
-      if (entityReg?.area_id) {
-        const area = this._hass.areas?.[entityReg.area_id];
-        areaName = area?.name || '';
-      }
-    } catch (e) { /* silent */ }
-
-    // Determine glow class based on mode
-    const glowClass = isOn ? `glow-${mode}` : '';
 
     return `
       <div class="control-popup">
         <div class="control-popup-header">
-          <div class="control-popup-name-area">
-            <div class="control-popup-title">${name}</div>
-            ${areaName ? `<div class="control-popup-area">${areaName}</div>` : ''}
-          </div>
-          <button class="control-popup-toggle ${isOn ? 'is-on' : ''}" data-action="toggle-power">
-            <span>${isOn ? 'ON' : 'OFF'}</span>
-            <ha-icon icon="mdi:power"></ha-icon>
+          <div class="control-popup-title">${name}</div>
+          <button class="control-popup-close">
+            <ha-icon icon="mdi:close"></ha-icon>
           </button>
         </div>
-
+        
         <div class="control-temp-section">
-          <div class="control-temp-glow ${glowClass}"></div>
-          ${humidity != null ? `<div class="control-humidity-badge"><ha-icon icon="mdi:water-percent"></ha-icon>${humidity}%</div>` : ''}
           <button class="control-temp-btn" data-action="temp-down">
             <ha-icon icon="mdi:minus"></ha-icon>
           </button>
-          <div class="control-temp-display">${isOn ? temp : '--'}<span>°C</span></div>
+          <div class="control-temp-display">${isOn ? temp : '--'}<span>°</span></div>
           <button class="control-temp-btn" data-action="temp-up">
             <ha-icon icon="mdi:plus"></ha-icon>
           </button>
         </div>
-
-        ${modes.length > 0 ? `
-          <div class="control-mode-section">
-            <div class="control-mode-grid">
-              ${modes.map(m => `
-                <button class="control-mode-btn ${m === mode ? 'active' : ''}" data-mode="${m}">
-                  <ha-icon icon="${this._getClimateIcon(m)}"></ha-icon>
-                </button>
-              `).join('')}
-            </div>
+        
+        <div class="control-mode-section">
+          <div class="control-mode-label">Mode</div>
+          <div class="control-mode-grid">
+            ${modes.map(m => `
+              <button class="control-mode-btn ${m === mode ? 'active' : ''}" data-mode="${m}">
+                <ha-icon icon="${this._getClimateIcon(m)}"></ha-icon>
+                <span>${this._getModeLabel(m)}</span>
+              </button>
+            `).join('')}
           </div>
-        ` : ''}
-
+        </div>
+        
         ${fanModes.length > 0 ? `
-          <div class="control-fan-section">
-            <div class="control-fan-label">Fan Level</div>
-            <div class="control-fan-grid">
-              ${fanModes.map(fm => `
-                <button class="control-fan-btn ${fm === currentFanMode ? 'active' : ''}" data-fan-mode="${fm}">
-                  ${this._getFanModeLabel(fm)}
+          <div class="control-mode-section">
+            <div class="control-mode-label">Fan</div>
+            <div class="control-mode-grid">
+              ${fanModes.slice(0, 4).map(fm => `
+                <button class="control-mode-btn ${fm === currentFanMode ? 'active' : ''}" data-fan-mode="${fm}">
+                  <ha-icon icon="${this._getFanIcon(fm)}"></ha-icon>
+                  <span>${fm}</span>
                 </button>
               `).join('')}
             </div>
@@ -4112,7 +4004,7 @@ class FavoritesGridCard extends HTMLElement {
       });
     }
 
-    // Control Popup Temperature Buttons (+/-)
+    // Control Popup Temperature Buttons
     this.shadowRoot.querySelectorAll('.control-temp-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const action = btn.dataset.action;
@@ -4125,7 +4017,7 @@ class FavoritesGridCard extends HTMLElement {
     });
 
     // Control Popup Mode Buttons
-    this.shadowRoot.querySelectorAll('.control-mode-btn[data-mode]').forEach(btn => {
+    this.shadowRoot.querySelectorAll('.control-popup .control-mode-btn[data-mode]').forEach(btn => {
       btn.addEventListener('click', () => {
         const mode = btn.dataset.mode;
         if (mode && this._controlPopupEntityId) {
@@ -4137,8 +4029,8 @@ class FavoritesGridCard extends HTMLElement {
       });
     });
 
-    // Control Popup Fan Mode Buttons (pill buttons)
-    this.shadowRoot.querySelectorAll('.control-popup .control-fan-btn[data-fan-mode]').forEach(btn => {
+    // Control Popup Fan Mode Buttons
+    this.shadowRoot.querySelectorAll('.control-popup .control-mode-btn[data-fan-mode]').forEach(btn => {
       btn.addEventListener('click', () => {
         const fanMode = btn.dataset.fanMode;
         if (fanMode && this._controlPopupEntityId) {
@@ -4149,21 +4041,6 @@ class FavoritesGridCard extends HTMLElement {
         }
       });
     });
-
-    // Control Popup ON/OFF Toggle
-    const powerToggle = this.shadowRoot.querySelector('.control-popup-toggle[data-action="toggle-power"]');
-    if (powerToggle) {
-      powerToggle.addEventListener('click', () => {
-        if (this._controlPopupEntityId) {
-          const entity = this._hass.states[this._controlPopupEntityId];
-          const isOn = entity && entity.state !== 'off' && entity.state !== 'unavailable';
-          this._hass.callService('climate', 'set_hvac_mode', {
-            entity_id: this._controlPopupEntityId,
-            hvac_mode: isOn ? 'off' : (entity?.attributes?.hvac_modes?.find(m => m !== 'off') || 'cool')
-          });
-        }
-      });
-    }
 
     // Control Popup Cover Buttons
     this.shadowRoot.querySelectorAll('.control-cover-btn').forEach(btn => {

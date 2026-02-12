@@ -102,6 +102,140 @@
           "description": "New custom name (leave empty to reset to default)."
         }
       }
+    },
+    "admin_get_all": {
+      "name": "Admin: Get All Favorites",
+      "description": "Get all users' favorites data, locks, and presets."
+    },
+    "admin_add_default": {
+      "name": "Admin: Add Default Entity",
+      "description": "Add an entity to all or specific users' favorites.",
+      "fields": {
+        "entity_id": {
+          "name": "Entity",
+          "description": "The entity to add."
+        },
+        "target_user_ids": {
+          "name": "Target Users",
+          "description": "Optional list of user IDs."
+        },
+        "custom_name": {
+          "name": "Custom Name",
+          "description": "Optional display name."
+        }
+      }
+    },
+    "admin_remove_entity": {
+      "name": "Admin: Remove Entity",
+      "description": "Remove an entity from specific users.",
+      "fields": {
+        "entity_id": {
+          "name": "Entity",
+          "description": "The entity to remove."
+        },
+        "target_user_ids": {
+          "name": "Target Users",
+          "description": "User IDs to remove from."
+        }
+      }
+    },
+    "admin_reorder": {
+      "name": "Admin: Reorder",
+      "description": "Reorder favorites for a user (bypasses locks).",
+      "fields": {
+        "user_id": {
+          "name": "User ID",
+          "description": "The user."
+        },
+        "entity_ids": {
+          "name": "Entity IDs",
+          "description": "Ordered list."
+        }
+      }
+    },
+    "admin_clone": {
+      "name": "Admin: Clone Favorites",
+      "description": "Clone favorites from one user to another.",
+      "fields": {
+        "source_user_id": {
+          "name": "Source User",
+          "description": "Copy from."
+        },
+        "target_user_id": {
+          "name": "Target User",
+          "description": "Copy to."
+        }
+      }
+    },
+    "admin_set_entity_lock": {
+      "name": "Admin: Lock/Unlock Entity",
+      "description": "Lock or unlock an entity for a user.",
+      "fields": {
+        "user_id": {
+          "name": "User ID",
+          "description": "The user."
+        },
+        "entity_id": {
+          "name": "Entity",
+          "description": "The entity."
+        },
+        "locked": {
+          "name": "Locked",
+          "description": "true=lock, false=unlock."
+        }
+      }
+    },
+    "admin_set_user_lock": {
+      "name": "Admin: Lock/Unlock User",
+      "description": "Lock or unlock a user.",
+      "fields": {
+        "user_id": {
+          "name": "User ID",
+          "description": "The user."
+        },
+        "locked": {
+          "name": "Locked",
+          "description": "true=lock, false=unlock."
+        }
+      }
+    },
+    "admin_save_preset": {
+      "name": "Admin: Save Preset",
+      "description": "Save a named preset template.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Preset name."
+        },
+        "entity_ids": {
+          "name": "Entity IDs",
+          "description": "Entities to include."
+        }
+      }
+    },
+    "admin_apply_preset": {
+      "name": "Admin: Apply Preset",
+      "description": "Apply preset to users.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Preset name."
+        },
+        "target_user_ids": {
+          "name": "Target Users",
+          "description": "Optional user list."
+        }
+      }
+    },
+    "admin_delete_preset": {
+      "name": "Admin: Delete Preset",
+      "description": "Delete a saved preset.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Preset name."
+        }
+      }
     }
   }
 }
